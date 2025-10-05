@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "ai_plugins",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v13)
     ],
@@ -14,7 +15,7 @@ let package = Package(
         .executableTarget(
             name: "ai_plugins",
             resources: [
-                .copy("Resources")
+                .process("Resources")
             ]
         ),
     ]

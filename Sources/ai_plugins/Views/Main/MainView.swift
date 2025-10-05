@@ -73,20 +73,20 @@ struct MainView: View {
                     settings.isDarkMode.toggle()
                     updateAppearance()
                 }) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         Image(systemName: settings.isDarkMode ? "sun.max.fill" : "moon.fill")
-                            .font(.system(size: 16))
-                        Text(settings.isDarkMode ? "Light Mode" : "Dark Mode")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 14))
+                        Text(settings.isDarkMode ? NSLocalizedString("light_mode", comment: "") : NSLocalizedString("dark_mode", comment: ""))
+                            .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
-                .help(settings.isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")
+                .help(settings.isDarkMode ? NSLocalizedString("switch_to_light", comment: "") : NSLocalizedString("switch_to_dark", comment: ""))
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
             .onAppear {
@@ -167,42 +167,46 @@ struct MainView: View {
 
     @ViewBuilder
     private var settingsContent: some View {
-        VStack(spacing: 4) {
-            ForEach(SettingsSection.allCases) { section in
-                Button(action: {
-                    selectedSettingsSection = section
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: section.icon)
-                            .font(.system(size: 14))
-                            .foregroundColor(.accentColor)
-                            .frame(width: 20)
-
-                        Text(NSLocalizedString(section.localizedNameKey, comment: ""))
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.primary)
-
-                        Spacer()
-
-                        if selectedSettingsSection == section {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 10, weight: .bold))
+        VStack(spacing: 0) {
+            VStack(spacing: 4) {
+                ForEach(SettingsSection.allCases) { section in
+                    Button(action: {
+                        selectedSettingsSection = section
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: section.icon)
+                                .font(.system(size: 14))
                                 .foregroundColor(.accentColor)
+                                .frame(width: 20)
+
+                            Text(NSLocalizedString(section.localizedNameKey, comment: ""))
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+
+                            Spacer()
+
+                            if selectedSettingsSection == section {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.accentColor)
+                            }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            selectedSettingsSection == section ?
+                                Color.accentColor.opacity(0.1) : Color.clear
+                        )
+                        .cornerRadius(6)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(
-                        selectedSettingsSection == section ?
-                            Color.accentColor.opacity(0.1) : Color.clear
-                    )
-                    .cornerRadius(6)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
+
+            Spacer()
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
     }
 
     @ViewBuilder
@@ -256,15 +260,9 @@ struct MainView: View {
         case .aiProvider:
             AIProviderSettingsView(settings: settings)
         case .inputMethod:
-            Text("Input Method Settings - Coming Soon")
-                .font(.title2)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            InputMethodSettingsView(settings: settings)
         case .modelSelection:
-            Text("Model Selection - Coming Soon")
-                .font(.title2)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ModelSelectionView(settings: settings)
         }
     }
 

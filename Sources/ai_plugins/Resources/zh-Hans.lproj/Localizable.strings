@@ -39,3 +39,44 @@
 "ai_provider" = "AI 服务提供商";
 "input_method" = "输入法";
 "model_selection" = "模型选择";
+
+/* AI Provider Settings */
+"add_provider" = "添加 AI 服务提供商";
+"provider_name" = "提供商名称";
+"api_endpoint" = "API 端点";
+"api_key" = "API 密钥";
+"test_connection" = "测试连接";
+"save" = "保存";
+"configured_providers" = "已配置的提供商";
+"no_providers" = "尚未配置提供商";
+"active" = "活跃";
+"activate" = "激活";
+"delete_provider" = "删除提供商";
+"connection_successful" = "连接成功！";
+
+/* Model Selection */
+"current_provider" = "当前提供商";
+"refresh" = "刷新";
+"available_models" = "可用模型";
+"no_models" = "没有可用模型";
+"refresh_models_hint" = "点击'刷新'从您的提供商获取模型";
+"no_active_provider" = "没有活跃的提供商";
+"configure_provider_first" = "请先配置并激活一个 AI 提供商";
+"selected" = "已选择";
+"models_count" = "个模型";
+
+/* Input Method Settings */
+"local_model" = "本地模型";
+"model_url" = "模型 URL";
+"browse_file" = "浏览模型文件";
+"model_path_hint" = "本地语言模型文件的路径";
+"model_name" = "模型名称";
+"model_identifier" = "模型标识符";
+"input_parameters" = "输入参数";
+"input_interval" = "输入间隔";
+"interval_hint" = "输入法更新之间的时间延迟";
+"appearance" = "外观";
+"skin_theme" = "皮肤主题";
+"theme_hint" = "选择输入法界面的视觉主题";
+"reset_defaults" = "恢复默认";
+"save_settings" = "保存设置";

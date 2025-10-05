@@ -39,3 +39,44 @@
 "ai_provider" = "AI Service Provider";
 "input_method" = "Input Method";
 "model_selection" = "Model Selection";
+
+/* AI Provider Settings */
+"add_provider" = "Add AI Service Provider";
+"provider_name" = "Provider Name";
+"api_endpoint" = "API Endpoint";
+"api_key" = "API Key";
+"test_connection" = "Test Connection";
+"save" = "Save";
+"configured_providers" = "Configured Providers";
+"no_providers" = "No providers configured yet";
+"active" = "Active";
+"activate" = "Activate";
+"delete_provider" = "Delete provider";
+"connection_successful" = "Connection successful!";
+
+/* Model Selection */
+"current_provider" = "Current Provider";
+"refresh" = "Refresh";
+"available_models" = "Available Models";
+"no_models" = "No models available";
+"refresh_models_hint" = "Click 'Refresh' to fetch models from your provider";
+"no_active_provider" = "No Active Provider";
+"configure_provider_first" = "Please configure and activate an AI provider first";
+"selected" = "Selected";
+"models_count" = "models";
+
+/* Input Method Settings */
+"local_model" = "Local Model";
+"model_url" = "Model URL";
+"browse_file" = "Browse for model file";
+"model_path_hint" = "Path to your local language model file";
+"model_name" = "Model Name";
+"model_identifier" = "Identifier for the model";
+"input_parameters" = "Input Parameters";
+"input_interval" = "Input Interval";
+"interval_hint" = "Time delay between input method updates";
+"appearance" = "Appearance";
+"skin_theme" = "Skin Theme";
+"theme_hint" = "Choose the visual theme for input method interface";
+"reset_defaults" = "Reset to Defaults";
+"save_settings" = "Save Settings";
