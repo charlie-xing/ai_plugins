@@ -40,6 +40,9 @@ install: build
 	@if [ -d "$(BUILD_DIR)/debug/$(PROJECT_NAME)_$(PROJECT_NAME).bundle" ]; then \
 		cp -R $(BUILD_DIR)/debug/$(PROJECT_NAME)_$(PROJECT_NAME).bundle "/Applications/$(PROJECT_NAME).app/Contents/Resources/"; \
 	fi
+	@if [ -f "Sources/$(PROJECT_NAME)/Resources/AppIcon.icns" ]; then \
+		cp "Sources/$(PROJECT_NAME)/Resources/AppIcon.icns" "/Applications/$(PROJECT_NAME).app/Contents/Resources/"; \
+	fi
 	@echo '<?xml version="1.0" encoding="UTF-8"?>' > "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
 	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
 	@echo '<plist version="1.0">' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
@@ -50,6 +53,8 @@ install: build
 	@echo '    <string>com.example.$(PROJECT_NAME)</string>' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
 	@echo '    <key>CFBundleName</key>' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
 	@echo '    <string>AI Plugins</string>' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
+	@echo '    <key>CFBundleIconFile</key>' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
+	@echo '    <string>AppIcon</string>' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
 	@echo '    <key>CFBundlePackageType</key>' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
 	@echo '    <string>APPL</string>' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
 	@echo '    <key>CFBundleShortVersionString</key>' >> "/Applications/$(PROJECT_NAME).app/Contents/Info.plist"
