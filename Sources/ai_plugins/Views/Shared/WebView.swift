@@ -1,17 +1,29 @@
 import SwiftUI
 import WebKit
 
+// Custom WKWebView that doesn't accept first responder
+class NonInteractiveWebView: WKWebView {
+    override var acceptsFirstResponder: Bool {
+        return false
+    }
+}
+
 // A SwiftUI wrapper for WKWebView that can be updated programmatically
 class UpdatableWebView: NSView {
-    let webView = WKWebView()
+    let webView: NonInteractiveWebView
 
     override init(frame: CGRect) {
+        webView = NonInteractiveWebView()
         super.init(frame: frame)
         addSubview(webView)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override var acceptsFirstResponder: Bool {
+        return false
     }
 
     override func layout() {
