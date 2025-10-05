@@ -1,10 +1,16 @@
 import SwiftUI
 
 struct MainView: View {
-    @StateObject private var viewModel = MainViewModel()
     @StateObject private var settings = AppSettings()
+    @StateObject private var viewModel: MainViewModel
     @State private var selectedTab: SidebarSection = .plugins
     @State private var selectedSettingsSection: SettingsSection = .aiProvider
+
+    init() {
+        let settings = AppSettings()
+        self._settings = StateObject(wrappedValue: settings)
+        self._viewModel = StateObject(wrappedValue: MainViewModel(settings: settings))
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -101,53 +107,89 @@ struct MainView: View {
 
     @ViewBuilder
     private var pluginListContent: some View {
-        if viewModel.plugins.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "puzzlepiece.extension")
-                    .font(.system(size: 32))
-                    .foregroundColor(.secondary.opacity(0.5))
-                Text(NSLocalizedString("no_plugins", comment: ""))
-                    .font(.caption)
+        VStack(spacing: 0) {
+            // Search box
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12))
                     .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            ScrollView {
-                VStack(spacing: 4) {
-                    ForEach(viewModel.plugins) { plugin in
-                        Button(action: {
-                            viewModel.selectedPlugin = plugin
-                        }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: getPluginIcon(for: plugin.mode))
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.accentColor)
-                                    .frame(width: 18)
 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(plugin.name)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.primary)
-                                    Text(plugin.description)
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                }
-
-                                Spacer()
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(viewModel.selectedPlugin?.id == plugin.id ? Color.accentColor.opacity(0.15) : Color.clear)
-                            )
-                        }
-                        .buttonStyle(.plain)
+                TextField(NSLocalizedString("search_plugins", comment: ""), text: $viewModel.searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .onChange(of: viewModel.searchText) { _ in
+                        viewModel.updateFilteredPlugins()
                     }
+
+                if !viewModel.searchText.isEmpty {
+                    Button(action: {
+                        viewModel.searchText = ""
+                        viewModel.updateFilteredPlugins()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            .cornerRadius(8)
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            // Plugin list
+            if viewModel.plugins.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: viewModel.searchText.isEmpty ? "puzzlepiece.extension" : "magnifyingglass")
+                        .font(.system(size: 32))
+                        .foregroundColor(.secondary.opacity(0.5))
+                    Text(viewModel.searchText.isEmpty ? NSLocalizedString("no_plugins", comment: "") : NSLocalizedString("no_matching_plugins", comment: ""))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 4) {
+                        ForEach(viewModel.plugins) { plugin in
+                            Button(action: {
+                                viewModel.openTab(for: plugin)
+                            }) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: getPluginIcon(for: plugin.mode))
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.accentColor)
+                                        .frame(width: 18)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(plugin.name)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(.primary)
+                                        Text(plugin.description)
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                    }
+
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(viewModel.activeTab?.plugin.id == plugin.id ? Color.accentColor.opacity(0.15) : Color.clear)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                }
             }
         }
     }
@@ -211,10 +253,11 @@ struct MainView: View {
 
     @ViewBuilder
     private var detailView: some View {
-        // 优先检查当前标签，而不是 selectedPlugin
-        if selectedTab == .settings {
+        // The detail view logic
+        switch selectedTab {
+        case .settings:
             settingsDetailView
-        } else if selectedTab == .history {
+        case .history:
             VStack(spacing: 16) {
                 Image(systemName: "clock.fill")
                     .font(.system(size: 64))
@@ -224,18 +267,22 @@ struct MainView: View {
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let selectedPlugin = viewModel.selectedPlugin {
-            PluginDetailView(plugin: selectedPlugin, settings: settings)
-        } else {
-            VStack(spacing: 16) {
-                Image(systemName: "puzzlepiece.extension.fill")
-                    .font(.system(size: 64))
-                    .foregroundColor(.secondary.opacity(0.5))
-                Text(NSLocalizedString("select_plugin", comment: ""))
-                    .font(.title2)
-                    .foregroundColor(.secondary)
+        case .plugins:
+            if !viewModel.openTabs.isEmpty {
+                // If there are open tabs, show the PluginDetailView which contains the tab bar
+                PluginDetailView(viewModel: viewModel)
+            } else {
+                // If no plugins are open, show a placeholder
+                VStack(spacing: 16) {
+                    Image(systemName: "puzzlepiece.extension.fill")
+                        .font(.system(size: 64))
+                        .foregroundColor(.secondary.opacity(0.5))
+                    Text(NSLocalizedString("select_plugin", comment: ""))
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

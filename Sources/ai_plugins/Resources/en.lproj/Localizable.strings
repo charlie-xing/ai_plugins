@@ -21,6 +21,8 @@
 /* Plugin List */
 "select_plugin" = "Select a plugin to start";
 "no_plugins" = "No plugins found";
+"search_plugins" = "Search plugins...";
+"no_matching_plugins" = "No matching plugins";
 
 /* Plugin Modes */
 "mode_chat" = "Chat";
@@ -80,3 +82,7 @@
 "theme_hint" = "Choose the visual theme for input method interface";
 "reset_defaults" = "Reset to Defaults";
 "save_settings" = "Save Settings";
+
+/* Window Title */
+"title_separator" = "→";
+"close_tab" = "Close Tab";

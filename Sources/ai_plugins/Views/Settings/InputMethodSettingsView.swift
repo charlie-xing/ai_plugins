@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct InputMethodSettingsView: View {
     @ObservedObject var settings: AppSettings
@@ -162,6 +163,10 @@ struct InputMethodSettingsView: View {
             .padding(20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear {
+            // Update window title to show current context
+            WindowTitleManager.shared.setSettingsTitle("input_method")
+        }
     }
 
     // MARK: - Actions

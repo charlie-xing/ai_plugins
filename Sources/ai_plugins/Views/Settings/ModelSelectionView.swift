@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct ModelSelectionView: View {
     @ObservedObject var settings: AppSettings
@@ -150,6 +151,8 @@ struct ModelSelectionView: View {
             if activeProvider != nil && settings.availableModels.isEmpty {
                 fetchModels()
             }
+            // Update window title to show current context
+            WindowTitleManager.shared.setSettingsTitle("model_selection")
         }
     }
 

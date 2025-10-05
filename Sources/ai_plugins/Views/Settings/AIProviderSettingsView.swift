@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct AIProviderSettingsView: View {
     @ObservedObject var settings: AppSettings
@@ -177,6 +178,8 @@ struct AIProviderSettingsView: View {
                 apiEndpoint = selectedProviderType.defaultEndpoint
                 providerName = selectedProviderType.rawValue
             }
+            // Update window title to show current context
+            WindowTitleManager.shared.setSettingsTitle("ai_provider")
         }
     }
 
