@@ -69,13 +69,13 @@ struct ExpandableTextInput: View {
 
                 Spacer()
 
-                // Send button
+                // Run button
                 Button(action: {
-                    print("ExpandableTextInput: Send button clicked, text: '\(text)'")
+                    print("ExpandableTextInput: Run button clicked, text: '\(text)'")
                     onSend()
                 }) {
                     HStack(spacing: 4) {
-                        Text("Send")
+                        Text("Run")
                             .font(.system(size: 13, weight: .medium))
                         Text("⌘↵")
                             .font(.system(size: 11))
@@ -123,6 +123,21 @@ struct ToolbarButton: View {
     }
 }
 
+/// Custom NSTextView that handles Command+Enter
+class CustomTextView: NSTextView {
+    var onCommandEnter: (() -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        // Check for Command+Enter
+        if event.keyCode == 36 && event.modifierFlags.contains(.command) { // 36 = Return key
+            print("CustomTextView: Command+Enter detected via keyDown")
+            onCommandEnter?()
+            return
+        }
+        super.keyDown(with: event)
+    }
+}
+
 /// NSTextView wrapper for multi-line input with auto-expansion
 struct ExpandableTextEditor: NSViewRepresentable {
     @Binding var text: String
@@ -135,10 +150,19 @@ struct ExpandableTextEditor: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
-        let textView = NSTextView()
+        let textView = CustomTextView()
 
         // Store reference in coordinator
         context.coordinator.textView = textView
+
+        // Set up Command+Enter handler
+        textView.onCommandEnter = { [weak textView] in
+            guard let textView = textView, !textView.string.isEmpty else { return }
+            print("CustomTextView: onCommandEnter callback triggered")
+            DispatchQueue.main.async {
+                self.onSend()
+            }
+        }
 
         // Configure text view
         textView.delegate = context.coordinator
@@ -220,7 +244,7 @@ struct ExpandableTextEditor: NSViewRepresentable {
 
     class Coordinator: NSObject, NSTextViewDelegate {
         var parent: ExpandableTextEditor
-        weak var textView: NSTextView?
+        weak var textView: CustomTextView?
 
         init(_ parent: ExpandableTextEditor) {
             self.parent = parent
@@ -233,17 +257,33 @@ struct ExpandableTextEditor: NSViewRepresentable {
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            print("ExpandableTextInput: doCommandBy called with selector: \(commandSelector)")
+
             // Command + Enter to send
             if commandSelector == #selector(NSResponder.insertNewline(_:)) {
                 let event = NSApp.currentEvent
+                print("ExpandableTextInput: insertNewline detected, modifierFlags: \(String(describing: event?.modifierFlags))")
+
                 if event?.modifierFlags.contains(.command) == true {
-                    parent.onSend()
+                    print("ExpandableTextInput: Command+Enter detected, triggering onSend")
+
+                    // Don't trigger if text is empty or disabled
+                    guard !parent.text.isEmpty && !parent.isDisabled else {
+                        print("ExpandableTextInput: Ignoring - text empty or disabled")
+                        return false
+                    }
+
+                    // Trigger the send action
+                    DispatchQueue.main.async {
+                        self.parent.onSend()
+                    }
                     return true
                 }
             }
             return false
         }
 
+        @MainActor
         func focusTextView() {
             textView?.window?.makeFirstResponder(textView)
         }

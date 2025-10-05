@@ -1,5 +1,5 @@
 import Foundation
-import JavaScriptCore
+@preconcurrency import JavaScriptCore
 
 struct JSResult: Decodable {
     let content: String
@@ -7,17 +7,23 @@ struct JSResult: Decodable {
     let replace: Bool
 }
 
-// Helper class to store result from async task
+// Helper classes to store results from async tasks
 private class ResultBox: @unchecked Sendable {
     var value: String = ""
+}
+
+private class ErrorBox: @unchecked Sendable {
+    var value: Error?
 }
 
 class JSBridge {
     private var context = JSContext()
     private var settings: AppSettings?
     private var loadedPlugins: Set<String> = []  // Track which plugins have been loaded
+    private let tabId: UUID
 
-    init(settings: AppSettings? = nil) {
+    init(tabId: UUID, settings: AppSettings? = nil) {
+        self.tabId = tabId
         self.settings = settings
         setupBridgedFunctions()
     }
@@ -123,19 +129,20 @@ class JSBridge {
                 request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
                 let semaphore = DispatchSemaphore(value: 0)
-                var result = "Error: Request failed"
+                let resultBox = ResultBox()
+                resultBox.value = "Error: Request failed"
 
                 URLSession.shared.dataTask(with: request) { data, response, error in
                     defer { semaphore.signal() }
 
                     if let error = error {
-                        result = "Error: \(error.localizedDescription)"
+                        resultBox.value = "Error: \(error.localizedDescription)"
                         return
                     }
 
                     guard let data = data,
                           let httpResponse = response as? HTTPURLResponse else {
-                        result = "Error: Invalid response from server"
+                        resultBox.value = "Error: Invalid response from server"
                         return
                     }
 
@@ -164,7 +171,7 @@ class JSBridge {
                             break
                         }
 
-                        result = errorMessage
+                        resultBox.value = errorMessage
                         return
                     }
 
@@ -174,17 +181,17 @@ class JSBridge {
                            let firstChoice = choices.first,
                            let message = firstChoice["message"] as? [String: Any],
                            let content = message["content"] as? String {
-                            result = content
+                            resultBox.value = content
                         } else {
-                            result = "Error: Invalid response format from API"
+                            resultBox.value = "Error: Invalid response format from API"
                         }
                     } catch {
-                        result = "Error: Failed to parse response - \(error.localizedDescription)"
+                        resultBox.value = "Error: Failed to parse response - \(error.localizedDescription)"
                     }
                 }.resume()
 
                 semaphore.wait()
-                return result
+                return resultBox.value
 
             } catch {
                 return "Error: Failed to prepare request - \(error.localizedDescription)"
@@ -201,18 +208,17 @@ class JSBridge {
                 return
             }
 
-            // Start async task
+            // Capture values locally before async dispatch to avoid Sendable warnings
             let settings = self.settings
             print("JSBridge: Starting background task for streaming")
-            DispatchQueue.global(qos: .userInitiated).async {
-                print("JSBridge: Background task started")
-                self.callAIStreamAPINonIsolated(
-                    userMessage: userMessage,
-                    settings: settings,
-                    onChunk: onChunk,
-                    onComplete: onComplete
-                )
-            }
+
+            // Call the non-isolated method directly to handle the async work
+            self.callAIStreamAPINonIsolated(
+                userMessage: userMessage,
+                settings: settings,
+                onChunk: onChunk,
+                onComplete: onComplete
+            )
         }
         context?.setObject(callAIStream, forKeyedSubscript: "callAIStream" as NSString)
 
@@ -239,14 +245,20 @@ class JSBridge {
         let updateUI: @convention(block) (String) -> Void = { [weak self] htmlContent in
             guard let self = self else { return }
 
-            print("JSBridge: updateUI called with HTML, length: \(htmlContent.count)")
+            print("JSBridge [\(self.tabId.uuidString.prefix(4))]: updateUI called with HTML, length: \(htmlContent.count)")
 
-            // Post notification on main thread
+            // Capture tabId locally to avoid data race when sending to main actor
+            let currentTabId = self.tabId
+
+            // Post notification on main thread with the tabId
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("PluginUIUpdate"),
                     object: nil,
-                    userInfo: ["htmlContent": htmlContent]
+                    userInfo: [
+                        "htmlContent": htmlContent,
+                        "tabId": currentTabId
+                    ]
                 )
             }
         }
@@ -255,6 +267,7 @@ class JSBridge {
 
     /// Call AI API with streaming support (non-isolated version for background execution)
     private func callAIStreamAPINonIsolated(userMessage: String, settings: AppSettings?, onChunk: JSValue, onComplete: JSValue) {
+        // Extract settings data before async dispatch to avoid Sendable warnings
         guard let settings = settings,
               let activeProvider = settings.aiProviders.first(where: { $0.id == settings.activeProviderId }),
               let selectedModel = settings.availableModels.first(where: { $0.id == settings.selectedModelId }) else {
@@ -263,41 +276,46 @@ class JSBridge {
         }
 
         let endpoint = "\(activeProvider.apiEndpoint)/chat/completions"
-        guard let url = URL(string: endpoint) else {
-            onComplete.call(withArguments: ["Error: Invalid API endpoint: \(endpoint)"])
-            return
-        }
+        let apiKey = activeProvider.apiKey
+        let modelId = selectedModel.id
 
-        print("JSBridge: Starting streaming AI API call at: \(endpoint)")
-        print("JSBridge: Using model: \(selectedModel.id)")
+        // Dispatch to background queue with captured immutable values
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let url = URL(string: endpoint) else {
+                onComplete.call(withArguments: ["Error: Invalid API endpoint: \(endpoint)"])
+                return
+            }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(activeProvider.apiKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 120
+            print("JSBridge: Starting streaming AI API call at: \(endpoint)")
+            print("JSBridge: Using model: \(modelId)")
 
-        let requestBody: [String: Any] = [
-            "model": selectedModel.id,
-            "messages": [
-                ["role": "user", "content": userMessage]
-            ],
-            "temperature": 0.7,
-            "max_tokens": 2000,
-            "stream": true  // Enable streaming
-        ]
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.timeoutInterval = 120
 
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+            let requestBody: [String: Any] = [
+                "model": modelId,
+                "messages": [
+                    ["role": "user", "content": userMessage]
+                ],
+                "temperature": 0.7,
+                "max_tokens": 2000,
+                "stream": true  // Enable streaming
+            ]
 
-            let semaphore = DispatchSemaphore(value: 0)
-            var streamError: Error?
+            do {
+                request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
-            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                let semaphore = DispatchSemaphore(value: 0)
+                let errorBox = ErrorBox()
+
+                let task = URLSession.shared.dataTask(with: request) { data, response, error in
                 defer { semaphore.signal() }
 
                 if let error = error {
-                    streamError = error
+                    errorBox.value = error
                     return
                 }
 
@@ -351,14 +369,15 @@ class JSBridge {
             task.resume()
             semaphore.wait()
 
-            if let error = streamError {
-                print("JSBridge: Stream error: \(error)")
+                if let error = errorBox.value {
+                    print("JSBridge: Stream error: \(error)")
+                    onComplete.call(withArguments: ["Error: \(error.localizedDescription)"])
+                }
+
+            } catch {
+                print("JSBridge: Stream setup error: \(error)")
                 onComplete.call(withArguments: ["Error: \(error.localizedDescription)"])
             }
-
-        } catch {
-            print("JSBridge: Stream setup error: \(error)")
-            onComplete.call(withArguments: ["Error: \(error.localizedDescription)"])
         }
     }
 

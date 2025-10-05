@@ -40,10 +40,39 @@ struct WebView: NSViewRepresentable {
     let htmlContent: String
 
     func makeNSView(context: Context) -> UpdatableWebView {
-        return UpdatableWebView()
+        let webView = UpdatableWebView()
+        webView.loadHTML(htmlContent) // Load initial content
+        return webView
     }
 
     func updateNSView(_ nsView: UpdatableWebView, context: Context) {
-        nsView.loadHTML(htmlContent)
+        print("--- WebView: updateNSView Called ---")
+        print("Incoming HTML hash: \(htmlContent.hashValue)")
+        print("Coordinator HTML hash: \(context.coordinator.lastLoadedHTML.hashValue)")
+        
+        // By comparing the new content with the coordinator's state, we ensure
+        // that we only reload the web view when the content has actually changed.
+        if htmlContent != context.coordinator.lastLoadedHTML {
+            print("Content is DIFFERENT. Loading new HTML.")
+            nsView.loadHTML(htmlContent)
+            context.coordinator.lastLoadedHTML = htmlContent
+        } else {
+            print("Content is the SAME. Skipping reload.")
+        }
+        print("------------------------------------")
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject {
+        var parent: WebView
+        var lastLoadedHTML: String = ""
+
+        init(_ parent: WebView) {
+            self.parent = parent
+            self.lastLoadedHTML = parent.htmlContent
+        }
     }
 }

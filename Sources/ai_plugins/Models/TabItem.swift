@@ -8,9 +8,10 @@ class TabItem: Identifiable, ObservableObject, Equatable {
     @Published var viewModel: PluginViewModel
 
     init(plugin: Plugin, settings: AppSettings) {
-        self.id = UUID()
+        let tabId = UUID()
+        self.id = tabId
         self.plugin = plugin
-        self.viewModel = PluginViewModel(settings: settings)
+        self.viewModel = PluginViewModel(tabId: tabId, settings: settings)
     }
 
     nonisolated static func == (lhs: TabItem, rhs: TabItem) -> Bool {

@@ -6,20 +6,29 @@ class PluginViewModel: ObservableObject {
     @Published var webViewContent: String = "<html><body><h1>Welcome!</h1><p>Enter a prompt below and run the plugin.</p></body></html>"
     @Published var prompt: String = ""
 
+    let tabId: UUID
     private var jsBridge: JSBridge
     private var cancellables = Set<AnyCancellable>()
 
-    init(settings: AppSettings) {
-        self.jsBridge = JSBridge(settings: settings)
+    init(tabId: UUID, settings: AppSettings) {
+        self.tabId = tabId
+        self.jsBridge = JSBridge(tabId: tabId, settings: settings)
 
-        // Listen for UI update notifications from JavaScript
+        // Listen for UI update notifications from JavaScript and filter by tabId
         NotificationCenter.default.publisher(for: NSNotification.Name("PluginUIUpdate"))
+            .filter {
+                // Ensure the notification is for this specific tab instance.
+                guard let notificationTabId = $0.userInfo?["tabId"] as? UUID else { return false }
+                return notificationTabId == self.tabId
+            }
             .compactMap { $0.userInfo?["htmlContent"] as? String }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] htmlContent in
                 guard let self = self else { return }
-                print("PluginViewModel: Received UI update from JavaScript, HTML length: \(htmlContent.count)")
+                print(">>> PluginViewModel [\(self.tabId.uuidString.prefix(4))]: Received PluginUIUpdate Notification!")
+                print(">>> New HTML Content Length: \(htmlContent.count)")
                 self.webViewContent = htmlContent
+                print(">>> self.webViewContent has been updated.")
             }
             .store(in: &cancellables)
     }
@@ -37,11 +46,13 @@ class PluginViewModel: ObservableObject {
             return
         }
 
-        print("PluginViewModel: Got resultValue: \(resultValue)")
-        print("PluginViewModel: resultValue type: \(type(of: resultValue))")
-        print("PluginViewModel: resultValue.isObject: \(resultValue.isObject)")
-        print("PluginViewModel: resultValue.isUndefined: \(resultValue.isUndefined)")
-        print("PluginViewModel: resultValue.isNull: \(resultValue.isNull)")
+        // If the result is undefined, it likely means the plugin is running an async operation
+        // (e.g., streaming) and will update the UI via `updateUI` notification.
+        // In this case, we don't want to overwrite the UI with an error.
+        if resultValue.isUndefined {
+            print("PluginViewModel: Plugin returned undefined, likely running an async operation. Awaiting UI update notification.")
+            return
+        }
 
         // The JS function is expected to return an object like {content: "...", type: "...", replace: true}
         if let resultDict = resultValue.toDictionary() {
