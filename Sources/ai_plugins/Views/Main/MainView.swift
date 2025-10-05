@@ -4,6 +4,7 @@ struct MainView: View {
     @StateObject private var viewModel = MainViewModel()
     @StateObject private var settings = AppSettings()
     @State private var selectedTab: SidebarSection = .plugins
+    @State private var selectedSettingsSection: SettingsSection = .aiProvider
 
     var body: some View {
         NavigationSplitView {
@@ -72,19 +73,20 @@ struct MainView: View {
                     settings.isDarkMode.toggle()
                     updateAppearance()
                 }) {
-                    HStack {
+                    HStack(spacing: 10) {
                         Image(systemName: settings.isDarkMode ? "sun.max.fill" : "moon.fill")
                             .font(.system(size: 16))
-                        Text(settings.isDarkMode ? NSLocalizedString("light_mode", comment: "") : NSLocalizedString("dark_mode", comment: ""))
-                            .font(.system(size: 13))
+                        Text(settings.isDarkMode ? "Light Mode" : "Dark Mode")
+                            .font(.system(size: 13, weight: .medium))
                     }
                     .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.vertical, 12)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
-                .help(settings.isDarkMode ? NSLocalizedString("switch_to_light", comment: "") : NSLocalizedString("switch_to_dark", comment: ""))
+                .help(settings.isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
             .onAppear {
@@ -165,25 +167,49 @@ struct MainView: View {
 
     @ViewBuilder
     private var settingsContent: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "gearshape.2.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.5))
-            Text(NSLocalizedString("settings", comment: ""))
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            Text("Switch to Settings tab to configure")
-                .font(.caption)
-                .foregroundColor(.secondary.opacity(0.7))
+        VStack(spacing: 4) {
+            ForEach(SettingsSection.allCases) { section in
+                Button(action: {
+                    selectedSettingsSection = section
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: section.icon)
+                            .font(.system(size: 14))
+                            .foregroundColor(.accentColor)
+                            .frame(width: 20)
+
+                        Text(NSLocalizedString(section.localizedNameKey, comment: ""))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.primary)
+
+                        Spacer()
+
+                        if selectedSettingsSection == section {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.accentColor)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        selectedSettingsSection == section ?
+                            Color.accentColor.opacity(0.1) : Color.clear
+                    )
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
     private var detailView: some View {
         // 优先检查当前标签，而不是 selectedPlugin
         if selectedTab == .settings {
-            SettingsView(settings: settings)
+            settingsDetailView
         } else if selectedTab == .history {
             VStack(spacing: 16) {
                 Image(systemName: "clock.fill")
@@ -221,6 +247,24 @@ struct MainView: View {
             return "theatermasks.fill"
         case .unknown:
             return "questionmark.circle.fill"
+        }
+    }
+
+    @ViewBuilder
+    private var settingsDetailView: some View {
+        switch selectedSettingsSection {
+        case .aiProvider:
+            AIProviderSettingsView(settings: settings)
+        case .inputMethod:
+            Text("Input Method Settings - Coming Soon")
+                .font(.title2)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .modelSelection:
+            Text("Model Selection - Coming Soon")
+                .font(.title2)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

@@ -1,0 +1,41 @@
+/* Main Navigation */
+"plugins" = "Plugins";
+"history" = "History";
+"settings" = "Settings";
+
+/* Theme */
+"light_mode" = "Light Mode";
+"dark_mode" = "Dark Mode";
+"switch_to_light" = "Switch to Light Mode";
+"switch_to_dark" = "Switch to Dark Mode";
+
+/* User Profile */
+"user_name" = "User Name";
+"change_avatar" = "Change Avatar";
+"guest" = "Guest";
+
+/* Input Area */
+"enter_prompt" = "Enter your prompt...";
+"send" = "Send";
+
+/* Plugin List */
+"select_plugin" = "Select a plugin to start";
+"no_plugins" = "No plugins found";
+
+/* Plugin Modes */
+"mode_chat" = "Chat";
+"mode_bot" = "BOT";
+"mode_agent" = "Agent";
+"mode_role" = "Role";
+
+/* History */
+"no_history" = "No history yet";
+"clear_history" = "Clear History";
+
+/* Settings */
+"api_settings" = "API Settings";
+"general_settings" = "General Settings";
+"model" = "Model";
+"ai_provider" = "AI Service Provider";
+"input_method" = "Input Method";
+"model_selection" = "Model Selection";

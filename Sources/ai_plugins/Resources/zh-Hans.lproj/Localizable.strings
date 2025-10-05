@@ -1,0 +1,41 @@
+/* Main Navigation */
+"plugins" = "插件";
+"history" = "历史";
+"settings" = "设置";
+
+/* Theme */
+"light_mode" = "明亮模式";
+"dark_mode" = "暗黑模式";
+"switch_to_light" = "切换到明亮模式";
+"switch_to_dark" = "切换到暗黑模式";
+
+/* User Profile */
+"user_name" = "用户名";
+"change_avatar" = "更换头像";
+"guest" = "访客";
+
+/* Input Area */
+"enter_prompt" = "输入您的提示...";
+"send" = "发送";
+
+/* Plugin List */
+"select_plugin" = "选择一个插件开始";
+"no_plugins" = "未找到插件";
+
+/* Plugin Modes */
+"mode_chat" = "对话";
+"mode_bot" = "机器人";
+"mode_agent" = "智能体";
+"mode_role" = "角色";
+
+/* History */
+"no_history" = "暂无历史记录";
+"clear_history" = "清空历史";
+
+/* Settings */
+"api_settings" = "API 设置";
+"general_settings" = "通用设置";
+"model" = "模型";
+"ai_provider" = "AI 服务提供商";
+"input_method" = "输入法";
+"model_selection" = "模型选择";
