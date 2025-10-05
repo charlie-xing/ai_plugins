@@ -39,25 +39,31 @@ class MainViewModel: ObservableObject {
     }
 
     func loadPlugins() {
-        // In a real app, this path would come from AppSettings
+        // Load plugins from app bundle
+        // Swift Package Manager creates a .bundle with resources
         let fileManager = FileManager.default
+
+        // First try to find the bundle (for built app)
+        if let bundleURL = Bundle.main.url(forResource: "ai_plugins_ai_plugins", withExtension: "bundle"),
+           Bundle(url: bundleURL) != nil {
+            let pluginDirectory = bundleURL
+            allPlugins = pluginManager.discoverPlugins(in: pluginDirectory)
+            plugins = filteredPlugins
+            print("Loaded \(allPlugins.count) plugins from bundle: \(pluginDirectory.path)")
+            return
+        }
+
+        // Fallback to old path for backward compatibility (development/testing)
         let homeDirectory = fileManager.homeDirectoryForCurrentUser
         let pluginDirectory = homeDirectory.appendingPathComponent("ai_plugins_data/plugins")
 
-        // Create the directory if it doesn't exist
-        if !fileManager.fileExists(atPath: pluginDirectory.path) {
-            do {
-                try fileManager.createDirectory(at: pluginDirectory, withIntermediateDirectories: true, attributes: nil)
-                print("Created plugin directory at: \(pluginDirectory.path)")
-            } catch {
-                print("Error creating plugin directory: \(error)")
-                return
-            }
+        if fileManager.fileExists(atPath: pluginDirectory.path) {
+            allPlugins = pluginManager.discoverPlugins(in: pluginDirectory)
+            plugins = filteredPlugins
+            print("Loaded \(allPlugins.count) plugins from: \(pluginDirectory.path)")
+        } else {
+            print("Error: No plugin directory found")
         }
-
-        allPlugins = pluginManager.discoverPlugins(in: pluginDirectory)
-        plugins = filteredPlugins
-        print("Loaded \(allPlugins.count) plugins.")
     }
 
     func updateFilteredPlugins() {
