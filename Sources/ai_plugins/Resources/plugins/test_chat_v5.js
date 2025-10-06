@@ -12,6 +12,11 @@ class ChatApp {
         this.messages = [];
         this.userSettings = null;
         this.isInitialized = false;
+        this.currentTheme = null;
+        this.themeStyleElement = null;
+        this.autoScroll = true;  // Auto-scroll by default
+        this.userScrolling = false;
+        this.scrollTimeout = null;
     }
 
     async init() {
@@ -40,8 +45,11 @@ class ChatApp {
             console.log('Loading highlight.js...');
             await this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js');
             console.log('Highlight.js loaded:', !!window.hljs);
-            await this.loadCSS('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css');
         }
+
+        // Load theme-appropriate CSS and setup theme listener
+        this.loadHighlightTheme();
+        this.setupThemeListener();
 
         // Configure marked with highlight.js (ensure hljs is loaded)
         if (window.marked && window.hljs) {
@@ -94,6 +102,60 @@ class ChatApp {
             document.head.appendChild(link);
             resolve(); // Don't wait for CSS
         });
+    }
+
+    isDarkMode() {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+
+    loadHighlightTheme() {
+        const isDark = this.isDarkMode();
+        const theme = isDark ? 'atom-one-dark' : 'atom-one-light';
+
+        // Remove old theme if exists
+        if (this.themeStyleElement) {
+            this.themeStyleElement.remove();
+        }
+
+        // Load new theme
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.id = 'hljs-theme';
+        link.href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${theme}.min.css`;
+        document.head.appendChild(link);
+        this.themeStyleElement = link;
+        this.currentTheme = theme;
+
+        console.log(`Loaded highlight.js theme: ${theme}`);
+    }
+
+    setupThemeListener() {
+        // Listen for theme changes
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        mediaQuery.addEventListener('change', (e) => {
+            console.log('Theme changed to:', e.matches ? 'dark' : 'light');
+            this.loadHighlightTheme();
+            // Re-highlight all existing code blocks
+            this.rehighlightAllCode();
+        });
+    }
+
+    rehighlightAllCode() {
+        if (!window.hljs) return;
+
+        // Find all code blocks and re-highlight them
+        document.querySelectorAll('pre code').forEach((codeBlock) => {
+            // Remove existing highlighting classes but keep language- classes
+            codeBlock.className = codeBlock.className
+                .split(' ')
+                .filter(cls => !cls.startsWith('hljs') || cls.startsWith('language-'))
+                .join(' ');
+
+            // Re-highlight
+            hljs.highlightElement(codeBlock);
+        });
+
+        console.log('Re-highlighted all code blocks');
     }
 
     loadUserSettings() {
@@ -202,26 +264,74 @@ class ChatApp {
                 position: absolute;
                 top: 8px;
                 right: 8px;
-                background: rgba(255,255,255,0.1);
-                border: 1px solid rgba(255,255,255,0.2);
-                color: #aaa;
-                padding: 4px 8px;
-                border-radius: 4px;
+                background: white;
+                border: 1.5px solid #6b7280;
+                padding: 0;
+                border-radius: 50%;
                 cursor: pointer;
-                font-size: 12px;
                 opacity: 0;
-                transition: opacity 0.2s, background 0.2s;
+                transition: opacity 0.2s, background 0.2s, border-color 0.2s, transform 0.1s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 32px;
+                height: 32px;
+            }
+            @media (prefers-color-scheme: dark) {
+                .copy-button {
+                    background: #1f2937;
+                    border-color: #9ca3af;
+                }
+            }
+            .copy-button svg {
+                width: 16px;
+                height: 16px;
+                stroke: #4b5563;
+            }
+            @media (prefers-color-scheme: dark) {
+                .copy-button svg {
+                    stroke: #d1d5db;
+                }
             }
             .message-content pre:hover .copy-button {
                 opacity: 1;
             }
             .copy-button:hover {
-                background: rgba(255,255,255,0.2);
-                color: #fff;
+                background: #f3f4f6;
+                border-color: #4b5563;
+                transform: scale(1.05);
+            }
+            @media (prefers-color-scheme: dark) {
+                .copy-button:hover {
+                    background: #374151;
+                    border-color: #d1d5db;
+                }
+            }
+            .copy-button:hover svg {
+                stroke: #1f2937;
+            }
+            @media (prefers-color-scheme: dark) {
+                .copy-button:hover svg {
+                    stroke: #f3f4f6;
+                }
             }
             .copy-button.copied {
-                background: #10b981;
-                color: white;
+                background: #f3f4f6;
+                border-color: #4b5563;
+            }
+            @media (prefers-color-scheme: dark) {
+                .copy-button.copied {
+                    background: #374151;
+                    border-color: #d1d5db;
+                }
+            }
+            .copy-button.copied svg {
+                stroke: #1f2937;
+            }
+            @media (prefers-color-scheme: dark) {
+                .copy-button.copied svg {
+                    stroke: #f3f4f6;
+                }
             }
             .streaming-cursor {
                 display: inline-block;
@@ -268,6 +378,25 @@ class ChatApp {
                 }
             }
         };
+
+        // Setup scroll listener to detect user scrolling
+        window.addEventListener('scroll', () => {
+            // Clear any pending timeout
+            if (this.scrollTimeout) {
+                clearTimeout(this.scrollTimeout);
+            }
+
+            // Check if user is near bottom (within 100px)
+            const isNearBottom = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 100);
+
+            if (isNearBottom) {
+                // User scrolled to bottom, enable auto-scroll
+                this.autoScroll = true;
+            } else {
+                // User scrolled up, disable auto-scroll
+                this.autoScroll = false;
+            }
+        });
     }
 
     addUserMessage(content) {
@@ -379,7 +508,16 @@ class ChatApp {
                     if (!pre.querySelector('.copy-button')) {
                         const button = document.createElement('button');
                         button.className = 'copy-button';
-                        button.textContent = 'Copy';
+                        button.title = 'Copy code';
+                        // SF Symbols style doc.on.clipboard icon
+                        button.innerHTML = `
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                <path d="M9 12h6"></path>
+                                <path d="M9 16h6"></path>
+                            </svg>
+                        `;
                         button.onclick = () => this.copyCode(button, codeBlock);
                         pre.appendChild(button);
                     }
@@ -390,17 +528,72 @@ class ChatApp {
 
     copyCode(button, codeBlock) {
         const code = codeBlock.textContent;
-        navigator.clipboard.writeText(code).then(() => {
-            button.textContent = 'Copied!';
-            button.classList.add('copied');
-            setTimeout(() => {
-                button.textContent = 'Copy';
-                button.classList.remove('copied');
-            }, 2000);
-        });
+
+        // Try modern clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(code).then(() => {
+                this.showCopySuccess(button);
+            }).catch(err => {
+                console.error('Clipboard API failed:', err);
+                this.fallbackCopy(code, button);
+            });
+        } else {
+            // Fallback to old method
+            this.fallbackCopy(code, button);
+        }
+    }
+
+    fallbackCopy(text, button) {
+        // Create temporary textarea
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+
+        try {
+            textarea.select();
+            const successful = document.execCommand('copy');
+            if (successful) {
+                this.showCopySuccess(button);
+            } else {
+                console.error('Copy command failed');
+            }
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    }
+
+    showCopySuccess(button) {
+        // SF Symbols style checkmark icon
+        button.innerHTML = `
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        `;
+        button.classList.add('copied');
+        setTimeout(() => {
+            // Back to clipboard icon
+            button.innerHTML = `
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <path d="M9 12h6"></path>
+                    <path d="M9 16h6"></path>
+                </svg>
+            `;
+            button.classList.remove('copied');
+        }, 2000);
     }
 
     smoothScrollToBottom() {
+        // Only auto-scroll if enabled (user hasn't scrolled up)
+        if (!this.autoScroll) {
+            return;
+        }
+
         // Use requestAnimationFrame for smooth scrolling
         requestAnimationFrame(() => {
             window.scrollTo({
