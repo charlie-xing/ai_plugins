@@ -6,6 +6,30 @@ class NonInteractiveWebView: WKWebView {
     override var acceptsFirstResponder: Bool {
         return false
     }
+
+    override init(frame: CGRect, configuration: WKWebViewConfiguration) {
+        super.init(frame: frame, configuration: configuration)
+
+        // Enable Safari Web Inspector for debugging
+        if #available(macOS 13.3, *) {
+            self.isInspectable = true
+        } else {
+            // For older versions, enable developer extras
+            UserDefaults.standard.set(true, forKey: "WebKitDeveloperExtras")
+        }
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+
+        // Enable Safari Web Inspector for debugging
+        if #available(macOS 13.3, *) {
+            self.isInspectable = true
+        } else {
+            // For older versions, enable developer extras
+            UserDefaults.standard.set(true, forKey: "WebKitDeveloperExtras")
+        }
+    }
 }
 
 // A SwiftUI wrapper for WKWebView that can be updated programmatically
@@ -13,7 +37,8 @@ class UpdatableWebView: NSView {
     let webView: NonInteractiveWebView
 
     override init(frame: CGRect) {
-        webView = NonInteractiveWebView()
+        let config = WKWebViewConfiguration()
+        webView = NonInteractiveWebView(frame: .zero, configuration: config)
         super.init(frame: frame)
         addSubview(webView)
     }

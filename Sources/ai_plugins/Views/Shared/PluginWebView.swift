@@ -23,6 +23,14 @@ struct PluginWebView: NSViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground") // Transparent background
 
+        // Enable Safari Web Inspector for debugging
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
+        } else {
+            // For older versions, enable developer extras
+            UserDefaults.standard.set(true, forKey: "WebKitDeveloperExtras")
+        }
+
         // Link bridge to webView AND link webView to viewModel
         context.coordinator.bridge.webView = webView
         viewModel.webView = webView
