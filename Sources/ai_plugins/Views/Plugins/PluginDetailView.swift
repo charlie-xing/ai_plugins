@@ -152,7 +152,10 @@ struct PluginDetailView: View {
 
             // WebView area - show content for the active tab
             if let activeTab = viewModel.activeTab {
-                TabContentView(viewModel: activeTab.viewModel)
+                TabContentView(
+                    viewModel: activeTab.viewModel,
+                    settings: viewModel.settingsViewModel.settings
+                )
             } else {
                 Spacer()
             }
@@ -181,16 +184,22 @@ struct PluginDetailView: View {
 /// Content view for a single tab - only contains WebView
 struct TabContentView: View {
     @ObservedObject var viewModel: PluginViewModel
+    let settings: AppSettings?
 
     var body: some View {
-        // WebView for output
-        WebView(htmlContent: viewModel.webViewContent)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.8))
-            .clipShape(RoundedCorners(radius: 12, corners: [.bottomLeft, .bottomRight]))
-            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-            .padding(.horizontal, 16)
-            .padding(.top, 0)  // Negative top padding to overlap with active tab and eliminate border
+        // WebView for output - using new PluginWebView
+        PluginWebView(
+            viewModel: viewModel,
+            tabId: viewModel.tabId,
+            htmlContent: viewModel.webViewContent,
+            settings: settings
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.8))
+        .clipShape(RoundedCorners(radius: 12, corners: [.bottomLeft, .bottomRight]))
+        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .padding(.horizontal, 16)
+        .padding(.top, 0)  // Negative top padding to overlap with active tab and eliminate border
     }
 }
 

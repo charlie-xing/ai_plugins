@@ -34,6 +34,15 @@ class UpdatableWebView: NSView {
     func loadHTML(_ htmlString: String) {
         webView.loadHTMLString(htmlString, baseURL: nil)
     }
+
+    func evaluateJavaScript(_ script: String) {
+        webView.evaluateJavaScript(script) { result, error in
+            if let error = error {
+                print("WebView JS Error: \(error)")
+                print("Script that failed: \(script.prefix(500))...")
+            }
+        }
+    }
 }
 
 struct WebView: NSViewRepresentable {
@@ -49,7 +58,39 @@ struct WebView: NSViewRepresentable {
         print("--- WebView: updateNSView Called ---")
         print("Incoming HTML hash: \(htmlContent.hashValue)")
         print("Coordinator HTML hash: \(context.coordinator.lastLoadedHTML.hashValue)")
-        
+
+        // Check if this is a JavaScript execution command
+        if htmlContent.hasPrefix("<script>") && htmlContent.hasSuffix("</script>") {
+            // Extract JavaScript code and execute it
+            let startIndex = htmlContent.index(htmlContent.startIndex, offsetBy: 8)
+            let endIndex = htmlContent.index(htmlContent.endIndex, offsetBy: -9)
+            let jsCode = String(htmlContent[startIndex..<endIndex])
+            print("Executing JavaScript: \(jsCode.prefix(100))...")
+
+            // Try to execute, if it fails due to function not ready, retry with delay
+            nsView.webView.evaluateJavaScript(jsCode) { result, error in
+                if let error = error {
+                    print("WebView JS Error: \(error)")
+                    print("Script that failed: \(jsCode.prefix(500))...")
+
+                    // If function not defined, retry after a short delay
+                    if error.localizedDescription.contains("undefined is not a function") {
+                        print("Function not ready, retrying after delay...")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            nsView.webView.evaluateJavaScript(jsCode) { _, retryError in
+                                if let retryError = retryError {
+                                    print("Retry failed: \(retryError)")
+                                } else {
+                                    print("Retry succeeded!")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return
+        }
+
         // By comparing the new content with the coordinator's state, we ensure
         // that we only reload the web view when the content has actually changed.
         if htmlContent != context.coordinator.lastLoadedHTML {

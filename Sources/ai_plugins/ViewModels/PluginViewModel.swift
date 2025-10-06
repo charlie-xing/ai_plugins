@@ -1,82 +1,162 @@
 import Foundation
 import Combine
+import WebKit
+import AppKit
 
 @MainActor
 class PluginViewModel: ObservableObject {
-    @Published var webViewContent: String = "<html><body><h1>Welcome!</h1><p>Enter a prompt below and run the plugin.</p></body></html>"
+    @Published var webViewContent: String = ""
     @Published var prompt: String = ""
 
     let tabId: UUID
-    private var jsBridge: JSBridge
     private var cancellables = Set<AnyCancellable>()
+    weak var webView: WKWebView?  // Will be set by PluginWebView
+    private var isPluginLoaded = false
+    private var currentPlugin: Plugin?
+    private let settings: AppSettings
 
     init(tabId: UUID, settings: AppSettings) {
         self.tabId = tabId
-        self.jsBridge = JSBridge(tabId: tabId, settings: settings)
-
-        // Listen for UI update notifications from JavaScript and filter by tabId
-        NotificationCenter.default.publisher(for: NSNotification.Name("PluginUIUpdate"))
-            .filter {
-                // Ensure the notification is for this specific tab instance.
-                guard let notificationTabId = $0.userInfo?["tabId"] as? UUID else { return false }
-                return notificationTabId == self.tabId
-            }
-            .compactMap { $0.userInfo?["htmlContent"] as? String }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] htmlContent in
-                guard let self = self else { return }
-                print(">>> PluginViewModel [\(self.tabId.uuidString.prefix(4))]: Received PluginUIUpdate Notification!")
-                print(">>> New HTML Content Length: \(htmlContent.count)")
-                self.webViewContent = htmlContent
-                print(">>> self.webViewContent has been updated.")
-            }
-            .store(in: &cancellables)
+        self.settings = settings
     }
-    
+
     func runPlugin(plugin: Plugin) {
         print("PluginViewModel: Running plugin '\(plugin.name)' with prompt: '\(prompt)'")
 
-        // Save prompt and clear it immediately
         let currentPrompt = prompt
         prompt = ""
 
-        guard let resultValue = jsBridge.runPlugin(plugin: plugin, args: [currentPrompt]) else {
-            print("PluginViewModel: Failed to execute plugin - resultValue is nil")
-            self.webViewContent = "<h1>Error</h1><p>Failed to execute plugin.</p>"
-            return
-        }
+        // If this is the first run or a different plugin, load the HTML
+        if !isPluginLoaded || currentPlugin?.id != plugin.id {
+            guard let pluginJS = loadPluginScript(plugin: plugin) else {
+                print("PluginViewModel: Failed to load plugin script")
+                self.webViewContent = "<html><body><h1>Error</h1><p>Failed to load plugin script.</p></body></html>"
+                return
+            }
 
-        // If the result is undefined, it likely means the plugin is running an async operation
-        // (e.g., streaming) and will update the UI via `updateUI` notification.
-        // In this case, we don't want to overwrite the UI with an error.
-        if resultValue.isUndefined {
-            print("PluginViewModel: Plugin returned undefined, likely running an async operation. Awaiting UI update notification.")
-            return
-        }
+            let htmlPage = createHTMLPage(pluginScript: pluginJS)
+            self.webViewContent = htmlPage
+            self.isPluginLoaded = true
+            self.currentPlugin = plugin
 
-        // The JS function is expected to return an object like {content: "...", type: "...", replace: true}
-        if let resultDict = resultValue.toDictionary() {
-            print("PluginViewModel: Converted to dictionary: \(resultDict)")
-
-            if let content = resultDict["content"] as? String,
-               let type = resultDict["type"] as? String {
-                print("PluginViewModel: Got content (length: \(content.count)) and type: \(type)")
-
-                if type == "html" {
-                    self.webViewContent = content
-                } else {
-                    // Handle other content types like 'text', 'imageUrl', etc.
-                    self.webViewContent = "<h1>\(content)</h1>"
-                }
-            } else {
-                print("PluginViewModel: Failed to extract content or type from dictionary")
-                print("PluginViewModel: content type: \(type(of: resultDict["content"]))")
-                print("PluginViewModel: type type: \(type(of: resultDict["type"]))")
-                self.webViewContent = "<h1>Error</h1><p>Plugin returned an invalid result format. Missing content or type.</p>"
+            // Execute plugin after delay to ensure HTML and auto-init complete
+            // Auto-init in DOMContentLoaded needs time to load marked.js and highlight.js
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.executePlugin(prompt: currentPrompt)
             }
         } else {
-            print("PluginViewModel: Failed to convert resultValue to dictionary")
-            self.webViewContent = "<h1>Error</h1><p>Plugin returned an invalid result format.</p>"
+            // Plugin already loaded, just execute with new prompt
+            executePlugin(prompt: currentPrompt)
         }
+    }
+
+    private func executePlugin(prompt: String) {
+        let escapedPrompt = prompt
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+
+        // Wrap the call to handle undefined return value
+        let script = """
+        (function() {
+            if (typeof runPlugin === 'function') {
+                runPlugin('\(escapedPrompt)');
+            }
+            return null;
+        })();
+        """
+        webView?.evaluateJavaScript(script) { result, error in
+            if let error = error {
+                print("PluginViewModel: Error executing plugin: \(error)")
+            }
+        }
+    }
+
+    private func loadPluginScript(plugin: Plugin) -> String? {
+        do {
+            let content = try String(contentsOf: plugin.filePath, encoding: .utf8)
+            print("PluginViewModel: Loaded plugin script from \(plugin.filePath), length: \(content.count)")
+            return content
+        } catch {
+            print("PluginViewModel: Error loading plugin file: \(error)")
+            return nil
+        }
+    }
+
+    private func createHTMLPage(pluginScript: String) -> String {
+        // Prepare settings JSON to inject
+        let settingsJSON = createSettingsJSON()
+
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body>
+            <script>
+            // Inject settings before plugin loads
+            window.INITIAL_SETTINGS = \(settingsJSON);
+            console.log('Injected settings:', window.INITIAL_SETTINGS);
+
+            // Plugin code
+            \(pluginScript)
+
+            // Mark as ready
+            window.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM loaded, plugin ready');
+            });
+            </script>
+        </body>
+        </html>
+        """
+    }
+
+    private func createSettingsJSON() -> String {
+        guard let activeProvider = settings.aiProviders.first(where: { $0.id == settings.activeProviderId }),
+              let selectedModel = settings.availableModels.first(where: { $0.id == settings.selectedModelId }) else {
+            return "{}"
+        }
+
+        // Convert avatar image to data URL (resize to 64x64 to keep HTML small)
+        var avatarValue = "👤"
+        if !settings.userAvatarPath.isEmpty {
+            if let image = NSImage(contentsOfFile: settings.userAvatarPath) {
+                // Resize to 64x64 to reduce data size
+                let targetSize = NSSize(width: 64, height: 64)
+                let resizedImage = NSImage(size: targetSize)
+                resizedImage.lockFocus()
+                image.draw(in: NSRect(origin: .zero, size: targetSize),
+                          from: NSRect(origin: .zero, size: image.size),
+                          operation: .copy,
+                          fraction: 1.0)
+                resizedImage.unlockFocus()
+
+                if let tiffData = resizedImage.tiffRepresentation,
+                   let bitmapImage = NSBitmapImageRep(data: tiffData),
+                   let jpegData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) {
+                    let base64String = jpegData.base64EncodedString()
+                    avatarValue = "data:image/jpeg;base64,\(base64String)"
+                    print("PluginViewModel: Avatar data URL size: \(jpegData.count) bytes")
+                }
+            }
+        }
+
+        let settingsDict: [String: Any] = [
+            "apiEndpoint": activeProvider.apiEndpoint,
+            "selectedModel": selectedModel.id,
+            "selectedModelName": selectedModel.name,
+            "userName": settings.userName.isEmpty ? "User" : settings.userName,
+            "userAvatar": avatarValue
+        ]
+
+        if let jsonData = try? JSONSerialization.data(withJSONObject: settingsDict),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            return jsonString
+        }
+
+        return "{}"
     }
 }

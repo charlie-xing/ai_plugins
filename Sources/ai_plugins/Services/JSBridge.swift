@@ -16,6 +16,98 @@ private class ErrorBox: @unchecked Sendable {
     var value: Error?
 }
 
+// URLSession delegate for handling streaming SSE responses
+private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    let onChunk: JSValue
+    let onComplete: JSValue
+    var buffer = ""
+    var hasError = false
+
+    init(onChunk: JSValue, onComplete: JSValue) {
+        self.onChunk = onChunk
+        self.onComplete = onComplete
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        guard let chunk = String(data: data, encoding: .utf8) else { return }
+        buffer += chunk
+
+        // Process complete lines
+        var lines = buffer.components(separatedBy: "\n")
+        // Keep the last incomplete line in buffer
+        buffer = lines.popLast() ?? ""
+
+        for line in lines {
+            // Skip empty lines and keep-alive comments
+            guard !line.isEmpty, !line.hasPrefix(": ") else { continue }
+
+            // Parse SSE data lines
+            if line.hasPrefix("data: ") {
+                let jsonString = String(line.dropFirst(6))
+
+                // Check for [DONE] marker
+                if jsonString == "[DONE]" {
+                    print("JSBridge: Stream completed with [DONE] marker")
+                    continue
+                }
+
+                // Parse JSON chunk
+                guard let jsonData = jsonString.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                    continue
+                }
+
+                // Extract content from delta
+                if let choices = json["choices"] as? [[String: Any]],
+                   let firstChoice = choices.first,
+                   let delta = firstChoice["delta"] as? [String: Any],
+                   let content = delta["content"] as? String {
+                    // Call JavaScript callback with the chunk
+                    DispatchQueue.main.async { [weak self] in
+                        self?.onChunk.call(withArguments: [content])
+                    }
+                }
+            }
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            if let error = error {
+                print("JSBridge: Stream error: \(error.localizedDescription)")
+                self.onComplete.call(withArguments: ["Error: \(error.localizedDescription)"])
+            } else {
+                print("JSBridge: Stream completed successfully")
+                self.onComplete.call(withArguments: [])
+            }
+        }
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            completionHandler(.cancel)
+            DispatchQueue.main.async { [weak self] in
+                self?.onComplete.call(withArguments: ["Error: Invalid response"])
+            }
+            return
+        }
+
+        if httpResponse.statusCode != 200 {
+            print("JSBridge: API returned status code \(httpResponse.statusCode)")
+            hasError = true
+            completionHandler(.cancel)
+            DispatchQueue.main.async { [weak self] in
+                self?.onComplete.call(withArguments: ["Error: API returned status code \(httpResponse.statusCode)"])
+            }
+            return
+        }
+
+        completionHandler(.allow)
+    }
+}
+
 class JSBridge {
     private var context = JSContext()
     private var settings: AppSettings?
@@ -279,105 +371,44 @@ class JSBridge {
         let apiKey = activeProvider.apiKey
         let modelId = selectedModel.id
 
-        // Dispatch to background queue with captured immutable values
-        DispatchQueue.global(qos: .userInitiated).async {
-            guard let url = URL(string: endpoint) else {
-                onComplete.call(withArguments: ["Error: Invalid API endpoint: \(endpoint)"])
-                return
-            }
+        guard let url = URL(string: endpoint) else {
+            onComplete.call(withArguments: ["Error: Invalid API endpoint: \(endpoint)"])
+            return
+        }
 
-            print("JSBridge: Starting streaming AI API call at: \(endpoint)")
-            print("JSBridge: Using model: \(modelId)")
+        print("JSBridge: Starting streaming AI API call at: \(endpoint)")
+        print("JSBridge: Using model: \(modelId)")
 
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-            request.timeoutInterval = 120
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 120
 
-            let requestBody: [String: Any] = [
-                "model": modelId,
-                "messages": [
-                    ["role": "user", "content": userMessage]
-                ],
-                "temperature": 0.7,
-                "max_tokens": 2000,
-                "stream": true  // Enable streaming
-            ]
+        let requestBody: [String: Any] = [
+            "model": modelId,
+            "messages": [
+                ["role": "user", "content": userMessage]
+            ],
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "stream": true  // Enable streaming
+        ]
 
-            do {
-                request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
-                let semaphore = DispatchSemaphore(value: 0)
-                let errorBox = ErrorBox()
+            // Create streaming delegate
+            let delegate = StreamingDelegate(onChunk: onChunk, onComplete: onComplete)
+            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
 
-                let task = URLSession.shared.dataTask(with: request) { data, response, error in
-                defer { semaphore.signal() }
-
-                if let error = error {
-                    errorBox.value = error
-                    return
-                }
-
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    onComplete.call(withArguments: ["Error: Invalid response from server"])
-                    return
-                }
-
-                guard httpResponse.statusCode == 200 else {
-                    var errorMessage = "Error: API returned status code \(httpResponse.statusCode)"
-                    if let data = data, let errorText = String(data: data, encoding: .utf8) {
-                        errorMessage += "\n\(errorText)"
-                    }
-                    onComplete.call(withArguments: [errorMessage])
-                    return
-                }
-
-                guard let data = data,
-                      let text = String(data: data, encoding: .utf8) else {
-                    onComplete.call(withArguments: ["Error: Failed to read response"])
-                    return
-                }
-
-                // Process streaming response line by line
-                let lines = text.components(separatedBy: "\n")
-                var fullContent = ""
-
-                for line in lines {
-                    guard !line.isEmpty, line.hasPrefix("data: ") else { continue }
-                    let jsonString = String(line.dropFirst(6))
-
-                    if jsonString == "[DONE]" { break }
-
-                    guard let jsonData = jsonString.data(using: .utf8),
-                          let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                          let choices = json["choices"] as? [[String: Any]],
-                          let firstChoice = choices.first,
-                          let delta = firstChoice["delta"] as? [String: Any],
-                          let content = delta["content"] as? String else {
-                        continue
-                    }
-
-                    fullContent += content
-                    onChunk.call(withArguments: [content])
-                }
-
-                print("JSBridge: Stream completed, total content length: \(fullContent.count)")
-                onComplete.call(withArguments: [])
-            }
-
+            let task = session.dataTask(with: request)
             task.resume()
-            semaphore.wait()
 
-                if let error = errorBox.value {
-                    print("JSBridge: Stream error: \(error)")
-                    onComplete.call(withArguments: ["Error: \(error.localizedDescription)"])
-                }
-
-            } catch {
-                print("JSBridge: Stream setup error: \(error)")
-                onComplete.call(withArguments: ["Error: \(error.localizedDescription)"])
-            }
+            print("JSBridge: Streaming task started")
+        } catch {
+            print("JSBridge: Stream setup error: \(error)")
+            onComplete.call(withArguments: ["Error: \(error.localizedDescription)"])
         }
     }
 

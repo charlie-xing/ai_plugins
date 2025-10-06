@@ -11,10 +11,10 @@ class MainViewModel: ObservableObject {
 
     private let pluginManager = PluginManager()
     private var allPlugins: [Plugin] = []
-    private var settings: AppSettings
+    let settingsViewModel: SettingsViewModel
 
     init(settings: AppSettings) {
-        self.settings = settings
+        self.settingsViewModel = SettingsViewModel(settings: settings)
     }
 
     var activeTab: TabItem? {
@@ -81,7 +81,7 @@ class MainViewModel: ObservableObject {
             activeTabId = existingTab.id
         } else {
             // Create new tab with its own ViewModel
-            let newTab = TabItem(plugin: plugin, settings: settings)
+            let newTab = TabItem(plugin: plugin, settings: settingsViewModel.settings)
             print("Creating new tab with id: \(newTab.id.uuidString)")
             openTabs.append(newTab)
             activeTabId = newTab.id
