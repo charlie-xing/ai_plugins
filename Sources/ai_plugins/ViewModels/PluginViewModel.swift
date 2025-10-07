@@ -15,6 +15,10 @@ class PluginViewModel: ObservableObject {
     private var currentPlugin: Plugin?
     private let settings: AppSettings
 
+    // 会话跟踪
+    var currentSession: ConversationSession?
+    var hasInteraction: Bool = false
+
     init(tabId: UUID, settings: AppSettings) {
         self.tabId = tabId
         self.settings = settings
@@ -216,5 +220,192 @@ class PluginViewModel: ObservableObject {
                 print("PluginViewModel: Avatar updated successfully")
             }
         }
+    }
+
+    // MARK: - 会话管理
+
+    /// 检查是否有交互内容
+    func checkHasInteraction(completion: @escaping (Bool) -> Void) {
+        guard let webView = webView else {
+            completion(false)
+            return
+        }
+
+        let script = """
+        (function() {
+            if (window.chatApp && window.chatApp.messages) {
+                return window.chatApp.messages.length > 0;
+            }
+            return false;
+        })();
+        """
+
+        webView.evaluateJavaScript(script) { result, error in
+            if let hasMessages = result as? Bool {
+                completion(hasMessages)
+            } else {
+                completion(false)
+            }
+        }
+    }
+
+    /// 获取会话标题（第一条用户消息）
+    func extractSessionTitle(completion: @escaping (String?) -> Void) {
+        guard let webView = webView else {
+            completion(nil)
+            return
+        }
+
+        let script = """
+        (function() {
+            if (window.chatApp && window.chatApp.messages) {
+                const userMessage = window.chatApp.messages.find(m => m.role === 'user');
+                if (userMessage && userMessage.content) {
+                    // 截取前50个字符作为标题
+                    return userMessage.content.substring(0, 50);
+                }
+            }
+            return null;
+        })();
+        """
+
+        webView.evaluateJavaScript(script) { result, error in
+            completion(result as? String)
+        }
+    }
+
+    /// 获取消息数量
+    func getMessageCount(completion: @escaping (Int) -> Void) {
+        guard let webView = webView else {
+            completion(0)
+            return
+        }
+
+        let script = """
+        (function() {
+            if (window.chatApp && window.chatApp.messages) {
+                return window.chatApp.messages.length;
+            }
+            return 0;
+        })();
+        """
+
+        webView.evaluateJavaScript(script) { result, error in
+            completion((result as? Int) ?? 0)
+        }
+    }
+
+    /// 获取完整的 WebView HTML 内容
+    func captureWebViewHTML(completion: @escaping (String?) -> Void) {
+        guard let webView = webView else {
+            completion(nil)
+            return
+        }
+
+        // 首先获取消息数据
+        let getMessagesScript = """
+        (function() {
+            if (window.chatApp && window.chatApp.messages) {
+                return JSON.stringify(window.chatApp.messages);
+            }
+            return null;
+        })();
+        """
+
+        webView.evaluateJavaScript(getMessagesScript) { messagesResult, error in
+            // 然后获取 HTML
+            webView.evaluateJavaScript("document.documentElement.outerHTML") { htmlResult, htmlError in
+                guard var html = htmlResult as? String else {
+                    completion(nil)
+                    return
+                }
+
+                // 如果有消息数据，注入到 HTML 中
+                if let messagesJSON = messagesResult as? String {
+                    let restorationScript = """
+                    <script>
+                    // Restore saved messages
+                    window.SAVED_MESSAGES = \(messagesJSON);
+                    console.log('Loaded saved messages:', window.SAVED_MESSAGES);
+                    </script>
+                    """
+
+                    // 在 </head> 之前插入
+                    if let headEndRange = html.range(of: "</head>", options: .caseInsensitive) {
+                        html.insert(contentsOf: restorationScript, at: headEndRange.lowerBound)
+                    }
+                }
+
+                completion(html)
+            }
+        }
+    }
+
+    /// 保存当前会话
+    func saveCurrentSession(historyManager: HistoryManager, completion: @escaping (Bool) -> Void) {
+        guard let plugin = currentPlugin else {
+            completion(false)
+            return
+        }
+
+        // 检查是否有交互
+        checkHasInteraction { [weak self] hasInteraction in
+            guard let self = self, hasInteraction else {
+                completion(false)
+                return
+            }
+
+            // 获取标题和消息数量
+            self.extractSessionTitle { title in
+                self.getMessageCount { messageCount in
+                    self.captureWebViewHTML { html in
+                        guard let html = html else {
+                            completion(false)
+                            return
+                        }
+
+                        // 创建或更新会话
+                        var session: ConversationSession
+                        if let existing = self.currentSession {
+                            session = existing
+                            session.updatedAt = Date()
+                            session.messageCount = messageCount
+                            if let newTitle = title, !newTitle.isEmpty {
+                                session.title = newTitle
+                            }
+                        } else {
+                            let sessionTitle = title ?? historyManager.generateDefaultTitle(for: plugin.name)
+                            session = ConversationSession(
+                                pluginId: plugin.id.uuidString,
+                                pluginName: plugin.name,
+                                title: sessionTitle,
+                                messageCount: messageCount
+                            )
+                            self.currentSession = session
+                        }
+
+                        // 保存会话
+                        historyManager.saveSession(session, htmlContent: html)
+                        self.hasInteraction = true
+                        completion(true)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 加载已有会话
+    func loadSession(_ session: ConversationSession, plugin: Plugin, historyManager: HistoryManager) {
+        guard let html = historyManager.loadSessionHTML(session) else {
+            print("PluginViewModel: Failed to load session HTML")
+            return
+        }
+
+        self.currentPlugin = plugin
+        self.currentSession = session
+        self.webViewContent = html
+        self.isPluginLoaded = true
+        self.hasInteraction = true
+        print("PluginViewModel: Loaded session '\(session.title)' for plugin '\(plugin.name)'")
     }
 }

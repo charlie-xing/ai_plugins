@@ -91,6 +91,7 @@ struct RoundedCorners: Shape {
 
 struct PluginDetailView: View {
     @ObservedObject var viewModel: MainViewModel
+    @ObservedObject var historyManager: HistoryManager
     @State private var sharedPrompt: String = ""
 
     var body: some View {
@@ -136,7 +137,7 @@ struct PluginDetailView: View {
                                 WindowTitleManager.shared.setPluginTitle(tab.plugin.name)
                             },
                             onClose: {
-                                viewModel.closeTab(tab.id)
+                                viewModel.closeTab(tab.id, historyManager: historyManager)
                             }
                         )
                     }

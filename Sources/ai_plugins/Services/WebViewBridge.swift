@@ -46,12 +46,78 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
         case "getSettings":
             handleGetSettings()
 
+        case "executeCode":
+            if let command = body["command"] as? String,
+               let args = body["args"] as? [String],
+               let callbackId = body["callbackId"] as? String {
+                handleExecuteCode(command: command, args: args, callbackId: callbackId)
+            }
+
         default:
             print("WebViewBridge: Unknown action: \(action)")
         }
     }
 
     // MARK: - Handler Methods
+
+    private func handleExecuteCode(command: String, args: [String], callbackId: String) {
+        print("WebViewBridge: Executing command: \(command) with args: \(args)")
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = [command] + args
+
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                let error = String(data: errorData, encoding: .utf8) ?? ""
+
+                let exitCode = process.terminationStatus
+
+                Task { @MainActor in
+                    if exitCode == 0 {
+                        self?.callExecuteCallback(callbackId: callbackId, success: true, output: output)
+                    } else {
+                        let errorMessage = error.isEmpty ? "Exit code: \(exitCode)" : error
+                        self?.callExecuteCallback(callbackId: callbackId, success: false, output: errorMessage)
+                    }
+                }
+            } catch {
+                Task { @MainActor in
+                    self?.callExecuteCallback(callbackId: callbackId, success: false, output: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func callExecuteCallback(callbackId: String, success: Bool, output: String) {
+        let escapedOutput = output
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+
+        let script = """
+        (function() {
+            if (window.executeCallbacks && window.executeCallbacks['\(callbackId)']) {
+                window.executeCallbacks['\(callbackId)'](\(success), '\(escapedOutput)');
+                delete window.executeCallbacks['\(callbackId)'];
+            }
+        })();
+        """
+        callJavaScript(script)
+    }
 
     private func handleStreamRequest(messages: [[String: Any]]) {
         guard let settings = settings,

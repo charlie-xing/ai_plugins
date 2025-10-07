@@ -93,8 +93,23 @@ class MainViewModel: ObservableObject {
         print("----------------------------------------------------")
     }
 
+    /// 打开带会话的新标签
+    func openPluginInNewTab(_ plugin: Plugin, session: ConversationSession, historyManager: HistoryManager) {
+        // 创建新标签
+        let newTab = TabItem(plugin: plugin, settings: settingsViewModel.settings)
+        openTabs.append(newTab)
+        activeTabId = newTab.id
+        selectedPlugin = plugin
+
+        // 加载会话到 ViewModel
+        newTab.viewModel.loadSession(session, plugin: plugin, historyManager: historyManager)
+
+        WindowTitleManager.shared.setPluginTitle(plugin.name)
+        print("MainViewModel: Opened plugin '\(plugin.name)' with session '\(session.title)'")
+    }
+
     /// Closes the tab with the given ID
-    func closeTab(_ tabId: UUID) {
+    func closeTab(_ tabId: UUID, historyManager: HistoryManager? = nil) {
         print("--- MainViewModel: closeTab called for tabId: \(tabId.uuidString) ---")
         print("Before close: openTabs count = \(openTabs.count), activeTabId = \(activeTabId?.uuidString ?? "nil")")
 
@@ -105,6 +120,35 @@ class MainViewModel: ObservableObject {
         }
 
         print("Closing tab at index \(index), plugin: \(openTabs[index].plugin.name)")
+
+        // 保存会话（如果有交互内容）- 保持 tab 引用直到保存完成
+        let tab = openTabs[index]
+
+        if let historyManager = historyManager {
+            // 先保存，保存完成后再删除标签页
+            tab.viewModel.saveCurrentSession(historyManager: historyManager) { [weak self] saved in
+                guard let self = self else { return }
+
+                if saved {
+                    print("MainViewModel: Session saved for tab: \(tab.plugin.name)")
+                }
+
+                // 保存完成后，执行实际的关闭逻辑
+                self.performCloseTab(tabId)
+            }
+        } else {
+            // 没有 historyManager，直接关闭
+            performCloseTab(tabId)
+        }
+    }
+
+    /// 实际执行关闭标签页的逻辑
+    private func performCloseTab(_ tabId: UUID) {
+        guard let index = openTabs.firstIndex(where: { $0.id == tabId }) else {
+            print("MainViewModel: Tab not found during performCloseTab")
+            return
+        }
+
         openTabs.remove(at: index)
         print("Remaining tabs count: \(openTabs.count)")
 

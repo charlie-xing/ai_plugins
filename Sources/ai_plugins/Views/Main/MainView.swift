@@ -3,6 +3,7 @@ import SwiftUI
 struct MainView: View {
     @StateObject private var settings = AppSettings()
     @StateObject private var viewModel: MainViewModel
+    @StateObject private var historyManager = HistoryManager()
     @State private var selectedTab: SidebarSection = .plugins
     @State private var selectedSettingsSection: SettingsSection = .aiProvider
 
@@ -196,15 +197,21 @@ struct MainView: View {
 
     @ViewBuilder
     private var historyContent: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "clock")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.5))
-            Text(NSLocalizedString("no_history", bundle: .module, comment: ""))
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        HistoryView(historyManager: historyManager) { session in
+            // 恢复会话：找到对应插件并打开新标签
+            print("MainView: Attempting to restore session '\(session.title)' for plugin ID: \(session.pluginId)")
+            print("MainView: Available plugins count: \(viewModel.plugins.count)")
+
+            if let plugin = viewModel.plugins.first(where: { $0.id.uuidString == session.pluginId }) {
+                print("MainView: Found matching plugin: \(plugin.name)")
+                viewModel.openPluginInNewTab(plugin, session: session, historyManager: historyManager)
+                selectedTab = .plugins
+            } else {
+                print("MainView: ERROR - Plugin not found for session!")
+                print("MainView: Looking for plugin ID: \(session.pluginId)")
+                print("MainView: Available plugin IDs: \(viewModel.plugins.map { $0.id.uuidString })")
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -270,7 +277,7 @@ struct MainView: View {
         case .plugins:
             if !viewModel.openTabs.isEmpty {
                 // If there are open tabs, show the PluginDetailView which contains the tab bar
-                PluginDetailView(viewModel: viewModel)
+                PluginDetailView(viewModel: viewModel, historyManager: historyManager)
             } else {
                 // If no plugins are open, show a placeholder
                 VStack(spacing: 16) {

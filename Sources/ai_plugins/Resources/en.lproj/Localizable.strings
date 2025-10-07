@@ -94,3 +94,9 @@
 "kpm" = "KPM";
 "typing_speed_tooltip" = "Average keystrokes per minute";
 "ai_acceptance_tooltip" = "AI suggestion acceptance rate";
+
+/* History */
+"yesterday" = "Yesterday";
+"days_ago" = "%d days ago";
+"delete_session" = "Delete";
+"messages" = "messages";
