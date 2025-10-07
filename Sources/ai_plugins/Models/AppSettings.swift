@@ -25,10 +25,14 @@ class AppSettings: ObservableObject {
     @Published var availableModels: [ModelInfo] = []
     @Published var selectedModelId: String?
 
+    // 用户输入统计
+    @Published var userInputStats = UserInputStats()
+
     init() {
         loadProviders()
         loadInputMethodSettings()
         loadModels()
+        loadUserInputStats()
     }
 
     // MARK: - Persistence
@@ -82,6 +86,19 @@ class AppSettings: ObservableObject {
         }
         selectedModelId = UserDefaults.standard.string(forKey: "selectedModelId")
     }
+
+    func saveUserInputStats() {
+        if let encoded = try? JSONEncoder().encode(userInputStats) {
+            UserDefaults.standard.set(encoded, forKey: "userInputStats")
+        }
+    }
+
+    func loadUserInputStats() {
+        if let data = UserDefaults.standard.data(forKey: "userInputStats"),
+           let decoded = try? JSONDecoder().decode(UserInputStats.self, from: data) {
+            userInputStats = decoded
+        }
+    }
 }
 
 enum SidebarSection: String, CaseIterable, Identifiable {
@@ -92,7 +109,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var localizedName: String {
-        NSLocalizedString(rawValue, comment: "")
+        NSLocalizedString(rawValue, bundle: .module, comment: "")
     }
 
     var icon: String {

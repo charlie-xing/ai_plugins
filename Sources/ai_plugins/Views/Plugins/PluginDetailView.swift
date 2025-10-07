@@ -164,7 +164,7 @@ struct PluginDetailView: View {
             if let activeTab = viewModel.activeTab {
                 ExpandableTextInput(
                     text: $sharedPrompt,
-                    placeholder: NSLocalizedString("enter_prompt", comment: ""),
+                    placeholder: NSLocalizedString("enter_prompt", bundle: .module, comment: ""),
                     onSend: {
                         print("PluginDetailView: onSend triggered for tab: \(activeTab.id)")
                         if !sharedPrompt.isEmpty {
@@ -247,7 +247,7 @@ struct TabButton: View {
                     )
             }
             .buttonStyle(.plain)
-            .help(NSLocalizedString("close_tab", comment: ""))
+            .help(NSLocalizedString("close_tab", bundle: .module, comment: ""))
             .onHover { hovering in
                 withAnimation(.easeInOut(duration: 0.1)) {
                     isHoveringClose = hovering

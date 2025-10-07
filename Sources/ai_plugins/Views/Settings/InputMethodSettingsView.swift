@@ -9,12 +9,12 @@ struct InputMethodSettingsView: View {
             VStack(spacing: 24) {
                 // Local Model Configuration
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(NSLocalizedString("local_model", comment: ""))
+                    Text(NSLocalizedString("local_model", bundle: .module, comment: ""))
                         .font(.headline)
 
                     // Local Model URL
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(NSLocalizedString("model_url", comment: ""))
+                        Text(NSLocalizedString("model_url", bundle: .module, comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
@@ -27,24 +27,24 @@ struct InputMethodSettingsView: View {
                                     .font(.system(size: 14))
                             }
                             .buttonStyle(.bordered)
-                            .help(NSLocalizedString("browse_file", comment: ""))
+                            .help(NSLocalizedString("browse_file", bundle: .module, comment: ""))
                         }
 
-                        Text(NSLocalizedString("model_path_hint", comment: ""))
+                        Text(NSLocalizedString("model_path_hint", bundle: .module, comment: ""))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
 
                     // Model Name
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(NSLocalizedString("model_name", comment: ""))
+                        Text(NSLocalizedString("model_name", bundle: .module, comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
                         TextField("e.g., gpt-3.5-turbo", text: $settings.inputMethodSettings.modelName)
                             .textFieldStyle(.roundedBorder)
 
-                        Text(NSLocalizedString("model_identifier", comment: ""))
+                        Text(NSLocalizedString("model_identifier", bundle: .module, comment: ""))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -55,13 +55,13 @@ struct InputMethodSettingsView: View {
 
                 // Input Parameters
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(NSLocalizedString("input_parameters", comment: ""))
+                    Text(NSLocalizedString("input_parameters", bundle: .module, comment: ""))
                         .font(.headline)
 
                     // Input Interval
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text(NSLocalizedString("input_interval", comment: ""))
+                            Text(NSLocalizedString("input_interval", bundle: .module, comment: ""))
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
 
@@ -96,7 +96,7 @@ struct InputMethodSettingsView: View {
                                 .foregroundColor(.secondary)
                         }
 
-                        Text(NSLocalizedString("interval_hint", comment: ""))
+                        Text(NSLocalizedString("interval_hint", bundle: .module, comment: ""))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -107,16 +107,16 @@ struct InputMethodSettingsView: View {
 
                 // Appearance Settings
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(NSLocalizedString("appearance", comment: ""))
+                    Text(NSLocalizedString("appearance", bundle: .module, comment: ""))
                         .font(.headline)
 
                     // Skin Theme
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(NSLocalizedString("skin_theme", comment: ""))
+                        Text(NSLocalizedString("skin_theme", bundle: .module, comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
-                        Picker(NSLocalizedString("skin_theme", comment: ""), selection: $settings.inputMethodSettings.skinTheme) {
+                        Picker(NSLocalizedString("skin_theme", bundle: .module, comment: ""), selection: $settings.inputMethodSettings.skinTheme) {
                             ForEach(SkinTheme.allCases, id: \.self) { theme in
                                 HStack {
                                     Image(systemName: theme.icon)
@@ -127,7 +127,7 @@ struct InputMethodSettingsView: View {
                         }
                         .pickerStyle(.segmented)
 
-                        Text(NSLocalizedString("theme_hint", comment: ""))
+                        Text(NSLocalizedString("theme_hint", bundle: .module, comment: ""))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -141,7 +141,7 @@ struct InputMethodSettingsView: View {
                     Button(action: resetToDefaults) {
                         HStack {
                             Image(systemName: "arrow.counterclockwise")
-                            Text(NSLocalizedString("reset_defaults", comment: ""))
+                            Text(NSLocalizedString("reset_defaults", bundle: .module, comment: ""))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -151,7 +151,7 @@ struct InputMethodSettingsView: View {
                     Button(action: saveSettings) {
                         HStack {
                             Image(systemName: "checkmark")
-                            Text(NSLocalizedString("save_settings", comment: ""))
+                            Text(NSLocalizedString("save_settings", bundle: .module, comment: ""))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)

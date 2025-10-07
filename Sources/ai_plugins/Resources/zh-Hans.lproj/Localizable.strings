@@ -13,6 +13,9 @@
 "user_name" = "用户名";
 "change_avatar" = "更换头像";
 "guest" = "访客";
+"adjust_avatar" = "调整头像";
+"cancel" = "取消";
+"confirm" = "确认";
 
 /* Input Area */
 "enter_prompt" = "输入您的提示...";
@@ -86,3 +89,8 @@
 /* Window Title */
 "title_separator" = "→";
 "close_tab" = "关闭标签";
+
+/* User Input Stats */
+"kpm" = "按键/分";
+"typing_speed_tooltip" = "平均每分钟按键次数";
+"ai_acceptance_tooltip" = "AI候选词采用率";

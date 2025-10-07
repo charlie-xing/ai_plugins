@@ -16,6 +16,9 @@ let package = Package(
             name: "ai_plugins",
             resources: [
                 .process("Resources")
+            ],
+            swiftSettings: [
+                .define("DEBUG", .when(configuration: .debug))
             ]
         ),
     ]

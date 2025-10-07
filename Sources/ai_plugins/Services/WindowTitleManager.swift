@@ -15,8 +15,8 @@ class WindowTitleManager {
     func setTitle(section: String, subsection: String? = nil) {
         guard let window = NSApplication.shared.windows.first else { return }
 
-        let localizedSection = NSLocalizedString(section, comment: "")
-        let separator = NSLocalizedString("title_separator", comment: "")
+        let localizedSection = NSLocalizedString(section, bundle: .module, comment: "")
+        let separator = NSLocalizedString("title_separator", bundle: .module, comment: "")
 
         if let subsection = subsection {
             window.title = "\(localizedSection) \(separator) \(subsection)"
@@ -34,7 +34,7 @@ class WindowTitleManager {
     /// Sets the window title for a settings section
     /// - Parameter settingKey: The localization key for the setting
     func setSettingsTitle(_ settingKey: String) {
-        let localizedSetting = NSLocalizedString(settingKey, comment: "")
+        let localizedSetting = NSLocalizedString(settingKey, bundle: .module, comment: "")
         setTitle(section: "settings", subsection: localizedSetting)
     }
 }

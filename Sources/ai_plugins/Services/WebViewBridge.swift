@@ -34,8 +34,13 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
             }
 
         case "callAIStream":
-            if let userMessage = body["message"] as? String {
-                handleStreamRequest(userMessage: userMessage)
+            // Accept both old format (single message) and new format (message history)
+            if let messages = body["messages"] as? [[String: Any]] {
+                handleStreamRequest(messages: messages)
+            } else if let userMessage = body["message"] as? String {
+                // Fallback to old single-message format
+                let singleMessage = [["role": "user", "content": userMessage]]
+                handleStreamRequest(messages: singleMessage)
             }
 
         case "getSettings":
@@ -48,7 +53,7 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
 
     // MARK: - Handler Methods
 
-    private func handleStreamRequest(userMessage: String) {
+    private func handleStreamRequest(messages: [[String: Any]]) {
         guard let settings = settings,
               let activeProvider = settings.aiProviders.first(where: { $0.id == settings.activeProviderId }),
               let selectedModel = settings.availableModels.first(where: { $0.id == settings.selectedModelId }) else {
@@ -62,7 +67,7 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
-        print("WebViewBridge: Starting stream to \(endpoint)")
+        print("WebViewBridge: Starting stream to \(endpoint) with \(messages.count) messages in context")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -72,9 +77,7 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
 
         let requestBody: [String: Any] = [
             "model": selectedModel.id,
-            "messages": [
-                ["role": "user", "content": userMessage]
-            ],
+            "messages": messages,  // Use full conversation history
             "temperature": 0.7,
             "max_tokens": 2000,
             "stream": true

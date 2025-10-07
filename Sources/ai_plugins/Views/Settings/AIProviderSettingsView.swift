@@ -22,16 +22,16 @@ struct AIProviderSettingsView: View {
             VStack(spacing: 24) {
                 // Add New Provider Section
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(NSLocalizedString("add_provider", comment: ""))
+                    Text(NSLocalizedString("add_provider", bundle: .module, comment: ""))
                         .font(.headline)
 
                     // Provider Type Picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(NSLocalizedString("ai_provider", comment: ""))
+                        Text(NSLocalizedString("ai_provider", bundle: .module, comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
-                        Picker(NSLocalizedString("ai_provider", comment: ""), selection: $selectedProviderType) {
+                        Picker(NSLocalizedString("ai_provider", bundle: .module, comment: ""), selection: $selectedProviderType) {
                             ForEach(ProviderType.allCases) { type in
                                 HStack {
                                     Image(systemName: type.icon)
@@ -49,7 +49,7 @@ struct AIProviderSettingsView: View {
 
                     // Provider Name
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(NSLocalizedString("provider_name", comment: ""))
+                        Text(NSLocalizedString("provider_name", bundle: .module, comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
@@ -59,7 +59,7 @@ struct AIProviderSettingsView: View {
 
                     // API Endpoint
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(NSLocalizedString("api_endpoint", comment: ""))
+                        Text(NSLocalizedString("api_endpoint", bundle: .module, comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
@@ -69,7 +69,7 @@ struct AIProviderSettingsView: View {
 
                     // API Key
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(NSLocalizedString("api_key", comment: ""))
+                        Text(NSLocalizedString("api_key", bundle: .module, comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
@@ -109,7 +109,7 @@ struct AIProviderSettingsView: View {
                                 } else {
                                     Image(systemName: "network")
                                 }
-                                Text(NSLocalizedString("test_connection", comment: ""))
+                                Text(NSLocalizedString("test_connection", bundle: .module, comment: ""))
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
@@ -120,7 +120,7 @@ struct AIProviderSettingsView: View {
                         Button(action: saveProvider) {
                             HStack {
                                 Image(systemName: "checkmark")
-                                Text(NSLocalizedString("save", comment: ""))
+                                Text(NSLocalizedString("save", bundle: .module, comment: ""))
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
@@ -135,7 +135,7 @@ struct AIProviderSettingsView: View {
 
                 // Configured Providers List
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(NSLocalizedString("configured_providers", comment: ""))
+                    Text(NSLocalizedString("configured_providers", bundle: .module, comment: ""))
                         .font(.headline)
 
                     if settings.aiProviders.isEmpty {
@@ -143,7 +143,7 @@ struct AIProviderSettingsView: View {
                             Image(systemName: "server.rack")
                                 .font(.system(size: 32))
                                 .foregroundColor(.secondary.opacity(0.5))
-                            Text(NSLocalizedString("no_providers", comment: ""))
+                            Text(NSLocalizedString("no_providers", bundle: .module, comment: ""))
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -288,7 +288,7 @@ struct ProviderRow: View {
 
             // Status Badge
             if isActive {
-                Text(NSLocalizedString("active", comment: ""))
+                Text(NSLocalizedString("active", bundle: .module, comment: ""))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
@@ -297,7 +297,7 @@ struct ProviderRow: View {
                     .cornerRadius(6)
             } else {
                 Button(action: onActivate) {
-                    Text(NSLocalizedString("activate", comment: ""))
+                    Text(NSLocalizedString("activate", bundle: .module, comment: ""))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.accentColor)
                 }
@@ -311,7 +311,7 @@ struct ProviderRow: View {
                     .foregroundColor(.red)
             }
             .buttonStyle(.plain)
-            .help(NSLocalizedString("delete_provider", comment: ""))
+            .help(NSLocalizedString("delete_provider", bundle: .module, comment: ""))
         }
         .padding(12)
         .background(isActive ? Color.accentColor.opacity(0.1) : Color(NSColor.controlBackgroundColor))

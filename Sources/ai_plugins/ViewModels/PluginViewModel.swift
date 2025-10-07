@@ -18,6 +18,13 @@ class PluginViewModel: ObservableObject {
     init(tabId: UUID, settings: AppSettings) {
         self.tabId = tabId
         self.settings = settings
+
+        // Monitor avatar changes via UserDefaults
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .sink { [weak self] _ in
+                self?.updateAvatarInWebView()
+            }
+            .store(in: &cancellables)
     }
 
     func runPlugin(plugin: Plugin) {
@@ -158,5 +165,56 @@ class PluginViewModel: ObservableObject {
         }
 
         return "{}"
+    }
+
+    private func updateAvatarInWebView() {
+        guard isPluginLoaded, let webView = webView else { return }
+
+        // Convert avatar to data URL
+        var avatarValue = "👤"
+        if !settings.userAvatarPath.isEmpty {
+            if let image = NSImage(contentsOfFile: settings.userAvatarPath) {
+                // Resize to 64x64 to reduce data size
+                let targetSize = NSSize(width: 64, height: 64)
+                let resizedImage = NSImage(size: targetSize)
+                resizedImage.lockFocus()
+                image.draw(in: NSRect(origin: .zero, size: targetSize),
+                          from: NSRect(origin: .zero, size: image.size),
+                          operation: .copy,
+                          fraction: 1.0)
+                resizedImage.unlockFocus()
+
+                if let tiffData = resizedImage.tiffRepresentation,
+                   let bitmapImage = NSBitmapImageRep(data: tiffData),
+                   let jpegData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) {
+                    let base64String = jpegData.base64EncodedString()
+                    avatarValue = "data:image/jpeg;base64,\(base64String)"
+                }
+            }
+        }
+
+        // Update avatar in WebView via JavaScript
+        let script = """
+        (function() {
+            if (window.INITIAL_SETTINGS) {
+                window.INITIAL_SETTINGS.userAvatar = '\(avatarValue)';
+                console.log('Avatar updated:', window.INITIAL_SETTINGS.userAvatar.substring(0, 50));
+
+                // If chatApp exists, update userSettings
+                if (window.chatApp && window.chatApp.userSettings) {
+                    window.chatApp.userSettings.userAvatar = '\(avatarValue)';
+                    console.log('ChatApp avatar updated');
+                }
+            }
+        })();
+        """
+
+        webView.evaluateJavaScript(script) { result, error in
+            if let error = error {
+                print("PluginViewModel: Error updating avatar: \(error)")
+            } else {
+                print("PluginViewModel: Avatar updated successfully")
+            }
+        }
     }
 }

@@ -22,6 +22,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.setActivationPolicy(.regular)
 
+        // Test localization
+        print("🌍 Localization test:")
+        print("  - System language: \(Locale.preferredLanguages.first ?? "unknown")")
+        print("  - NSLocalizedString(\"plugins\"): \(NSLocalizedString("plugins", bundle: .module, comment: ""))")
+        print("  - NSLocalizedString(\"settings\"): \(NSLocalizedString("settings", bundle: .module, comment: ""))")
+
+        // Test with Bundle.module
+        #if SWIFT_PACKAGE
+        let testString = NSLocalizedString("plugins", bundle: .module, comment: "")
+        print("  - Bundle.module NSLocalizedString(\"plugins\"): \(testString)")
+        #endif
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.setupWindow()
         }

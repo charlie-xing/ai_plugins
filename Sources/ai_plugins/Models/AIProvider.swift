@@ -29,7 +29,7 @@ enum ProviderType: String, Codable, CaseIterable, Identifiable {
         case .qwen:
             return "https://dashscope.aliyuncs.com/api/v1"
         case .ollama:
-            return "http://localhost:11434/api"
+            return "http://localhost:11434/v1"
         case .openrouter:
             return "https://openrouter.ai/api/v1"
         case .custom:
@@ -72,14 +72,16 @@ struct AIProvider: Identifiable, Codable, Hashable {
     var lastTested: Date?
     var isConnected: Bool
 
-    init(id: UUID = UUID(),
-         name: String = "",
-         providerType: ProviderType = .openai,
-         apiEndpoint: String = "",
-         apiKey: String = "",
-         isActive: Bool = false,
-         lastTested: Date? = nil,
-         isConnected: Bool = false) {
+    init(
+        id: UUID = UUID(),
+        name: String = "",
+        providerType: ProviderType = .openai,
+        apiEndpoint: String = "",
+        apiKey: String = "",
+        isActive: Bool = false,
+        lastTested: Date? = nil,
+        isConnected: Bool = false
+    ) {
         self.id = id
         self.name = name
         self.providerType = providerType

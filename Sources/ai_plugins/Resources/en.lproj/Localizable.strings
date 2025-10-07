@@ -13,6 +13,9 @@
 "user_name" = "User Name";
 "change_avatar" = "Change Avatar";
 "guest" = "Guest";
+"adjust_avatar" = "Adjust Avatar";
+"cancel" = "Cancel";
+"confirm" = "Confirm";
 
 /* Input Area */
 "enter_prompt" = "Enter your prompt...";
@@ -86,3 +89,8 @@
 /* Window Title */
 "title_separator" = "→";
 "close_tab" = "Close Tab";
+
+/* User Input Stats */
+"kpm" = "KPM";
+"typing_speed_tooltip" = "Average keystrokes per minute";
+"ai_acceptance_tooltip" = "AI suggestion acceptance rate";

@@ -17,7 +17,7 @@ struct ModelSelectionView: View {
                 // Active Provider Info
                 if let provider = activeProvider {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(NSLocalizedString("current_provider", comment: ""))
+                        Text(NSLocalizedString("current_provider", bundle: .module, comment: ""))
                             .font(.headline)
 
                         HStack(spacing: 12) {
@@ -48,7 +48,7 @@ struct ModelSelectionView: View {
                                         Image(systemName: "arrow.clockwise")
                                             .font(.system(size: 12))
                                     }
-                                    Text(NSLocalizedString("refresh", comment: ""))
+                                    Text(NSLocalizedString("refresh", bundle: .module, comment: ""))
                                         .font(.system(size: 12, weight: .medium))
                                 }
                                 .padding(.horizontal, 12)
@@ -82,12 +82,12 @@ struct ModelSelectionView: View {
                     // Available Models List
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            Text(NSLocalizedString("available_models", comment: ""))
+                            Text(NSLocalizedString("available_models", bundle: .module, comment: ""))
                                 .font(.headline)
 
                             Spacer()
 
-                            Text("\(settings.availableModels.count) \(NSLocalizedString("models_count", comment: ""))")
+                            Text("\(settings.availableModels.count) \(NSLocalizedString("models_count", bundle: .module, comment: ""))")
                                 .font(.system(size: 12))
                                 .foregroundColor(.secondary)
                         }
@@ -97,10 +97,10 @@ struct ModelSelectionView: View {
                                 Image(systemName: "cpu")
                                     .font(.system(size: 40))
                                     .foregroundColor(.secondary.opacity(0.5))
-                                Text(NSLocalizedString("no_models", comment: ""))
+                                Text(NSLocalizedString("no_models", bundle: .module, comment: ""))
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
-                                Text(NSLocalizedString("refresh_models_hint", comment: ""))
+                                Text(NSLocalizedString("refresh_models_hint", bundle: .module, comment: ""))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
@@ -131,10 +131,10 @@ struct ModelSelectionView: View {
                         Image(systemName: "exclamationmark.circle")
                             .font(.system(size: 48))
                             .foregroundColor(.secondary.opacity(0.5))
-                        Text(NSLocalizedString("no_active_provider", comment: ""))
+                        Text(NSLocalizedString("no_active_provider", bundle: .module, comment: ""))
                             .font(.title3)
                             .foregroundColor(.secondary)
-                        Text(NSLocalizedString("configure_provider_first", comment: ""))
+                        Text(NSLocalizedString("configure_provider_first", bundle: .module, comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -247,7 +247,7 @@ struct ModelRow: View {
 
                 // Selected Badge
                 if isSelected {
-                    Text(NSLocalizedString("selected", comment: ""))
+                    Text(NSLocalizedString("selected", bundle: .module, comment: ""))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)

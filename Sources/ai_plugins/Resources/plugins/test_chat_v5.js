@@ -625,9 +625,20 @@ class ChatApp {
         this.addUserMessage(userPrompt);
         this.startAssistantMessage();
 
+        // Build conversation history for context
+        const conversationHistory = this.messages
+            .filter(msg => !msg.streaming) // Exclude the currently streaming message
+            .map(msg => ({
+                role: msg.role,
+                content: msg.content
+            }));
+
+        console.log('Sending conversation history:', conversationHistory);
+
         window.webkit.messageHandlers.callAI.postMessage({
             action: 'callAIStream',
-            message: userPrompt
+            message: userPrompt,
+            messages: conversationHistory  // Send full conversation history
         });
     }
 }

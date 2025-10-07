@@ -82,7 +82,7 @@ struct MainView: View {
                     HStack(spacing: 8) {
                         Image(systemName: settings.isDarkMode ? "sun.max.fill" : "moon.fill")
                             .font(.system(size: 14))
-                        Text(settings.isDarkMode ? NSLocalizedString("light_mode", comment: "") : NSLocalizedString("dark_mode", comment: ""))
+                        Text(settings.isDarkMode ? NSLocalizedString("light_mode", bundle: .module, comment: "") : NSLocalizedString("dark_mode", bundle: .module, comment: ""))
                             .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundColor(.secondary)
@@ -92,7 +92,7 @@ struct MainView: View {
                 }
                 .buttonStyle(.plain)
                 .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
-                .help(settings.isDarkMode ? NSLocalizedString("switch_to_light", comment: "") : NSLocalizedString("switch_to_dark", comment: ""))
+                .help(settings.isDarkMode ? NSLocalizedString("switch_to_light", bundle: .module, comment: "") : NSLocalizedString("switch_to_dark", bundle: .module, comment: ""))
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
             .onAppear {
@@ -114,7 +114,7 @@ struct MainView: View {
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
 
-                TextField(NSLocalizedString("search_plugins", comment: ""), text: $viewModel.searchText)
+                TextField(NSLocalizedString("search_plugins", bundle: .module, comment: ""), text: $viewModel.searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .onChange(of: viewModel.searchText) { _ in
@@ -147,7 +147,7 @@ struct MainView: View {
                     Image(systemName: viewModel.searchText.isEmpty ? "puzzlepiece.extension" : "magnifyingglass")
                         .font(.system(size: 32))
                         .foregroundColor(.secondary.opacity(0.5))
-                    Text(viewModel.searchText.isEmpty ? NSLocalizedString("no_plugins", comment: "") : NSLocalizedString("no_matching_plugins", comment: ""))
+                    Text(viewModel.searchText.isEmpty ? NSLocalizedString("no_plugins", bundle: .module, comment: "") : NSLocalizedString("no_matching_plugins", bundle: .module, comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -200,7 +200,7 @@ struct MainView: View {
             Image(systemName: "clock")
                 .font(.system(size: 48))
                 .foregroundColor(.secondary.opacity(0.5))
-            Text(NSLocalizedString("no_history", comment: ""))
+            Text(NSLocalizedString("no_history", bundle: .module, comment: ""))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -221,7 +221,7 @@ struct MainView: View {
                                 .foregroundColor(.accentColor)
                                 .frame(width: 20)
 
-                            Text(NSLocalizedString(section.localizedNameKey, comment: ""))
+                            Text(NSLocalizedString(section.localizedNameKey, bundle: .module, comment: ""))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.primary)
 
@@ -262,7 +262,7 @@ struct MainView: View {
                 Image(systemName: "clock.fill")
                     .font(.system(size: 64))
                     .foregroundColor(.secondary.opacity(0.5))
-                Text(NSLocalizedString("no_history", comment: ""))
+                Text(NSLocalizedString("no_history", bundle: .module, comment: ""))
                     .font(.title2)
                     .foregroundColor(.secondary)
             }
@@ -277,7 +277,7 @@ struct MainView: View {
                     Image(systemName: "puzzlepiece.extension.fill")
                         .font(.system(size: 64))
                         .foregroundColor(.secondary.opacity(0.5))
-                    Text(NSLocalizedString("select_plugin", comment: ""))
+                    Text(NSLocalizedString("select_plugin", bundle: .module, comment: ""))
                         .font(.title2)
                         .foregroundColor(.secondary)
                 }
