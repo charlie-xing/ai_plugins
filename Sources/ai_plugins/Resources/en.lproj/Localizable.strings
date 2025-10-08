@@ -100,3 +100,109 @@
 "days_ago" = "%d days ago";
 "delete_session" = "Delete";
 "messages" = "messages";
+
+/* Knowledge Base */
+"knowledge_base" = "Knowledge Base";
+"knowledge_base_settings" = "Knowledge Base Settings";
+"knowledge_base_description" = "Configure and manage your knowledge bases, supporting local folders, web crawling, and enterprise API";
+"add_knowledge_base" = "Add Knowledge Base";
+"configured_knowledge_bases" = "Configured Knowledge Bases";
+"knowledge_bases_count" = "knowledge bases";
+"no_knowledge_bases" = "No knowledge bases configured";
+"add_knowledge_base_hint" = "Click 'Add Knowledge Base' to configure your first knowledge base";
+"delete_knowledge_base" = "Delete Knowledge Base";
+"delete_knowledge_base_message" = "Are you sure you want to delete knowledge base";
+"configure" = "Configure";
+
+/* Knowledge Base Types */
+"local_folder_kb" = "Local Folder";
+"web_site_kb" = "Web Site";
+"enterprise_api_kb" = "Enterprise API";
+"local_folder_kb_desc" = "Index documents from local folders";
+"web_site_kb_desc" = "Crawl and index website content";
+"enterprise_api_kb_desc" = "Connect to enterprise knowledge base API";
+
+/* Knowledge Base Configuration */
+"basic_information" = "Basic Information";
+"knowledge_base_name" = "Knowledge Base Name";
+"enter_kb_name" = "Enter knowledge base name";
+"description_optional" = "Description (Optional)";
+"enter_kb_description" = "Enter knowledge base description";
+"knowledge_base_type" = "Knowledge Base Type";
+"configuration" = "Configuration";
+
+/* Local Folder Config */
+"folder_path" = "Folder Path";
+"select_folder" = "Select folder";
+"browse" = "Browse";
+"include_subfolders" = "Include Subfolders";
+"supported_extensions" = "Supported File Extensions";
+"extensions_placeholder" = "txt,md,pdf";
+"extensions_hint" = "Separate multiple extensions with commas, e.g.: txt,md,pdf";
+
+/* Web Site Config */
+"website_url" = "Website URL";
+"enter_website_url" = "Enter website URL";
+"crawl_depth" = "Crawl Depth";
+"crawl_depth_hint" = "Link depth from the starting page";
+"max_pages" = "Max Pages";
+"respect_robots_txt" = "Respect robots.txt";
+
+/* Enterprise API Config */
+"enter_api_endpoint" = "Enter API endpoint";
+"enter_api_key" = "Enter API key";
+"timeout_seconds" = "Timeout (seconds)";
+
+/* Knowledge Base Status */
+"current_status" = "Current Status";
+"status" = "Status";
+"vectors" = "vectors";
+"last_updated" = "Last updated";
+"enabled" = "Enabled";
+"edit_knowledge_base" = "Edit Knowledge Base";
+"save_changes" = "Save Changes";
+"select" = "Select";
+
+/* Knowledge Base Actions */
+"actions" = "Actions";
+"index_files" = "Index Files";
+"crawl_website" = "Crawl Website";
+"sync_data" = "Sync Data";
+"clear_data" = "Clear Data";
+"index_files_desc" = "Scan and index documents in folder";
+"crawl_website_desc" = "Crawl web pages and build index";
+"sync_data_desc" = "Sync latest data from enterprise API";
+"clear_data_desc" = "Delete all vectorized data";
+
+/* Knowledge Base Processing Status */
+"processing" = "Processing";
+"indexing_files" = "Indexing files...";
+"crawling_website" = "Crawling website...";
+"syncing_data" = "Syncing data...";
+
+/* Knowledge Base Status Values */
+"kb_status_ready" = "Ready";
+"kb_status_not_configured" = "Not Configured";
+"kb_status_needs_indexing" = "Needs Indexing";
+"kb_status_needs_crawling" = "Needs Crawling";
+"kb_status_needs_sync" = "Needs Sync";
+"kb_status_disabled" = "Disabled";
+"kb_status_processing" = "Processing";
+"kb_status_error" = "Error";
+
+/* Knowledge Base Processing */
+"scanning_folder" = "Scanning folder";
+"processing_files" = "Processing files";
+"completing_processing" = "Completing processing";
+"cancelled" = "Cancelled";
+"initializing_crawler" = "Initializing crawler";
+"checking_robots" = "Checking robots.txt";
+"connecting_to_api" = "Connecting to API";
+"fetching_document_count" = "Fetching document count";
+"syncing_documents" = "Syncing documents";
+
+/* Knowledge Base Service Manager */
+"starting_processing" = "Starting processing";
+"vectorizing_documents" = "Vectorizing documents";
+"processing_completed" = "Processing completed";
+"processing_cancelled" = "Processing cancelled";

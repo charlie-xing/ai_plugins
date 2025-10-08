@@ -100,3 +100,109 @@
 "days_ago" = "%d天前";
 "delete_session" = "删除";
 "messages" = "条消息";
+
+/* Knowledge Base */
+"knowledge_base" = "知识库";
+"knowledge_base_settings" = "知识库设置";
+"knowledge_base_description" = "配置和管理您的知识库，支持本地文件夹、网站爬虫和企业API三种类型";
+"add_knowledge_base" = "添加知识库";
+"configured_knowledge_bases" = "已配置的知识库";
+"knowledge_bases_count" = "个知识库";
+"no_knowledge_bases" = "暂无知识库";
+"add_knowledge_base_hint" = "点击'添加知识库'开始配置您的第一个知识库";
+"delete_knowledge_base" = "删除知识库";
+"delete_knowledge_base_message" = "确定要删除知识库";
+"configure" = "配置";
+
+/* Knowledge Base Types */
+"local_folder_kb" = "本地文件夹";
+"web_site_kb" = "网站爬虫";
+"enterprise_api_kb" = "企业API";
+"local_folder_kb_desc" = "索引本地文件夹中的文档";
+"web_site_kb_desc" = "爬取网站内容并索引";
+"enterprise_api_kb_desc" = "连接企业知识库API";
+
+/* Knowledge Base Configuration */
+"basic_information" = "基本信息";
+"knowledge_base_name" = "知识库名称";
+"enter_kb_name" = "请输入知识库名称";
+"description_optional" = "描述（可选）";
+"enter_kb_description" = "请输入知识库描述";
+"knowledge_base_type" = "知识库类型";
+"configuration" = "配置";
+
+/* Local Folder Config */
+"folder_path" = "文件夹路径";
+"select_folder" = "选择文件夹";
+"browse" = "浏览";
+"include_subfolders" = "包含子文件夹";
+"supported_extensions" = "支持的文件扩展名";
+"extensions_placeholder" = "txt,md,pdf";
+"extensions_hint" = "用逗号分隔多个扩展名，如：txt,md,pdf";
+
+/* Web Site Config */
+"website_url" = "网站地址";
+"enter_website_url" = "请输入网站地址";
+"crawl_depth" = "爬取深度";
+"crawl_depth_hint" = "从起始页面开始的链接深度";
+"max_pages" = "最大页面数";
+"respect_robots_txt" = "遵循robots.txt";
+
+/* Enterprise API Config */
+"enter_api_endpoint" = "请输入API端点";
+"enter_api_key" = "请输入API密钥";
+"timeout_seconds" = "超时时间（秒）";
+
+/* Knowledge Base Status */
+"current_status" = "当前状态";
+"status" = "状态";
+"vectors" = "向量";
+"last_updated" = "最后更新";
+"enabled" = "启用";
+"edit_knowledge_base" = "编辑知识库";
+"save_changes" = "保存更改";
+"select" = "选择";
+
+/* Knowledge Base Actions */
+"actions" = "操作";
+"index_files" = "索引文件";
+"crawl_website" = "爬取网站";
+"sync_data" = "同步数据";
+"clear_data" = "清空数据";
+"index_files_desc" = "扫描并索引文件夹中的文档";
+"crawl_website_desc" = "爬取网站页面并建立索引";
+"sync_data_desc" = "从企业API同步最新数据";
+"clear_data_desc" = "删除所有向量化数据";
+
+/* Knowledge Base Processing Status */
+"processing" = "处理中";
+"indexing_files" = "正在索引文件...";
+"crawling_website" = "正在爬取网站...";
+"syncing_data" = "正在同步数据...";
+
+/* Knowledge Base Status Values */
+"kb_status_ready" = "就绪";
+"kb_status_not_configured" = "未配置";
+"kb_status_needs_indexing" = "需要索引";
+"kb_status_needs_crawling" = "需要爬取";
+"kb_status_needs_sync" = "需要同步";
+"kb_status_disabled" = "已禁用";
+"kb_status_processing" = "处理中";
+"kb_status_error" = "错误";
+
+/* Knowledge Base Processing */
+"scanning_folder" = "正在扫描文件夹";
+"processing_files" = "正在处理文件";
+"completing_processing" = "正在完成处理";
+"cancelled" = "已取消";
+"initializing_crawler" = "正在初始化爬虫";
+"checking_robots" = "正在检查 robots.txt";
+"connecting_to_api" = "正在连接到 API";
+"fetching_document_count" = "正在获取文档数量";
+"syncing_documents" = "正在同步文档";
+
+/* Knowledge Base Service Manager */
+"starting_processing" = "开始处理";
+"vectorizing_documents" = "正在向量化文档";
+"processing_completed" = "处理完成";
+"processing_cancelled" = "处理已取消";

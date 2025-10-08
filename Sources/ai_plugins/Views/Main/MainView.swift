@@ -35,13 +35,17 @@ struct MainView: View {
                             ZStack {
                                 // Background layer (full clickable area)
                                 Rectangle()
-                                    .fill(selectedTab == section ? Color.accentColor.opacity(0.1) : Color.clear)
+                                    .fill(
+                                        selectedTab == section
+                                            ? Color.accentColor.opacity(0.1) : Color.clear
+                                    )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                                 // Icon layer
                                 Image(systemName: section.icon)
                                     .font(.system(size: 16))
-                                    .foregroundColor(selectedTab == section ? .accentColor : .secondary)
+                                    .foregroundColor(
+                                        selectedTab == section ? .accentColor : .secondary)
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
@@ -83,8 +87,12 @@ struct MainView: View {
                     HStack(spacing: 8) {
                         Image(systemName: settings.isDarkMode ? "sun.max.fill" : "moon.fill")
                             .font(.system(size: 14))
-                        Text(settings.isDarkMode ? NSLocalizedString("light_mode", bundle: .module, comment: "") : NSLocalizedString("dark_mode", bundle: .module, comment: ""))
-                            .font(.system(size: 12, weight: .medium))
+                        Text(
+                            settings.isDarkMode
+                                ? NSLocalizedString("light_mode", bundle: .module, comment: "")
+                                : NSLocalizedString("dark_mode", bundle: .module, comment: "")
+                        )
+                        .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
@@ -93,7 +101,10 @@ struct MainView: View {
                 }
                 .buttonStyle(.plain)
                 .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
-                .help(settings.isDarkMode ? NSLocalizedString("switch_to_light", bundle: .module, comment: "") : NSLocalizedString("switch_to_dark", bundle: .module, comment: ""))
+                .help(
+                    settings.isDarkMode
+                        ? NSLocalizedString("switch_to_light", bundle: .module, comment: "")
+                        : NSLocalizedString("switch_to_dark", bundle: .module, comment: ""))
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
             .onAppear {
@@ -115,12 +126,15 @@ struct MainView: View {
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
 
-                TextField(NSLocalizedString("search_plugins", bundle: .module, comment: ""), text: $viewModel.searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12))
-                    .onChange(of: viewModel.searchText) { _ in
-                        viewModel.updateFilteredPlugins()
-                    }
+                TextField(
+                    NSLocalizedString("search_plugins", bundle: .module, comment: ""),
+                    text: $viewModel.searchText
+                )
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .onChange(of: viewModel.searchText) { _ in
+                    viewModel.updateFilteredPlugins()
+                }
 
                 if !viewModel.searchText.isEmpty {
                     Button(action: {
@@ -145,12 +159,19 @@ struct MainView: View {
             // Plugin list
             if viewModel.plugins.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: viewModel.searchText.isEmpty ? "puzzlepiece.extension" : "magnifyingglass")
-                        .font(.system(size: 32))
-                        .foregroundColor(.secondary.opacity(0.5))
-                    Text(viewModel.searchText.isEmpty ? NSLocalizedString("no_plugins", bundle: .module, comment: "") : NSLocalizedString("no_matching_plugins", bundle: .module, comment: ""))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Image(
+                        systemName: viewModel.searchText.isEmpty
+                            ? "puzzlepiece.extension" : "magnifyingglass"
+                    )
+                    .font(.system(size: 32))
+                    .foregroundColor(.secondary.opacity(0.5))
+                    Text(
+                        viewModel.searchText.isEmpty
+                            ? NSLocalizedString("no_plugins", bundle: .module, comment: "")
+                            : NSLocalizedString("no_matching_plugins", bundle: .module, comment: "")
+                    )
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -182,7 +203,9 @@ struct MainView: View {
                                 .padding(.vertical, 6)
                                 .background(
                                     RoundedRectangle(cornerRadius: 6)
-                                        .fill(viewModel.activeTab?.plugin.id == plugin.id ? Color.accentColor.opacity(0.15) : Color.clear)
+                                        .fill(
+                                            viewModel.activeTab?.plugin.id == plugin.id
+                                                ? Color.accentColor.opacity(0.15) : Color.clear)
                                 )
                             }
                             .buttonStyle(.plain)
@@ -199,17 +222,22 @@ struct MainView: View {
     private var historyContent: some View {
         HistoryView(historyManager: historyManager) { session in
             // 恢复会话：找到对应插件并打开新标签
-            print("MainView: Attempting to restore session '\(session.title)' for plugin ID: \(session.pluginId)")
+            print(
+                "MainView: Attempting to restore session '\(session.title)' for plugin ID: \(session.pluginId)"
+            )
             print("MainView: Available plugins count: \(viewModel.plugins.count)")
 
-            if let plugin = viewModel.plugins.first(where: { $0.id.uuidString == session.pluginId }) {
+            if let plugin = viewModel.plugins.first(where: { $0.id.uuidString == session.pluginId })
+            {
                 print("MainView: Found matching plugin: \(plugin.name)")
-                viewModel.openPluginInNewTab(plugin, session: session, historyManager: historyManager)
+                viewModel.openPluginInNewTab(
+                    plugin, session: session, historyManager: historyManager)
                 selectedTab = .plugins
             } else {
                 print("MainView: ERROR - Plugin not found for session!")
                 print("MainView: Looking for plugin ID: \(session.pluginId)")
-                print("MainView: Available plugin IDs: \(viewModel.plugins.map { $0.id.uuidString })")
+                print(
+                    "MainView: Available plugin IDs: \(viewModel.plugins.map { $0.id.uuidString })")
             }
         }
     }
@@ -228,9 +256,12 @@ struct MainView: View {
                                 .foregroundColor(.accentColor)
                                 .frame(width: 20)
 
-                            Text(NSLocalizedString(section.localizedNameKey, bundle: .module, comment: ""))
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.primary)
+                            Text(
+                                NSLocalizedString(
+                                    section.localizedNameKey, bundle: .module, comment: "")
+                            )
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.primary)
 
                             Spacer()
 
@@ -243,8 +274,8 @@ struct MainView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(
-                            selectedSettingsSection == section ?
-                                Color.accentColor.opacity(0.1) : Color.clear
+                            selectedSettingsSection == section
+                                ? Color.accentColor.opacity(0.1) : Color.clear
                         )
                         .cornerRadius(6)
                     }
@@ -317,10 +348,13 @@ struct MainView: View {
             InputMethodSettingsView(settings: settings)
         case .modelSelection:
             ModelSelectionView(settings: settings)
+        case .knowledgeBase:
+            KnowledgeBaseSettingsView(settings: settings)
         }
     }
 
     private func updateAppearance() {
-        NSApp.appearance = settings.isDarkMode ? NSAppearance(named: .darkAqua) : NSAppearance(named: .aqua)
+        NSApp.appearance =
+            settings.isDarkMode ? NSAppearance(named: .darkAqua) : NSAppearance(named: .aqua)
     }
 }
