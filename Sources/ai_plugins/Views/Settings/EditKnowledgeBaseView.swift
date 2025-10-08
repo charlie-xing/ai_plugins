@@ -13,6 +13,11 @@ struct EditKnowledgeBaseView: View {
     @State private var isValidConfiguration = true
     @State private var isProcessing = false
     @State private var processingStatus = ""
+    @State private var processingProgress: Double = 0.0
+    @State private var currentFile = ""
+    @State private var totalFiles = 0
+    @State private var processedFiles = 0
+    @State private var currentStep = ""
 
     // Local Folder Config
     @State private var folderPath: String
@@ -323,6 +328,88 @@ struct EditKnowledgeBaseView: View {
             Text(NSLocalizedString("actions", bundle: .module, comment: ""))
                 .font(.headline)
 
+            // Progress Section - Only show when processing
+            if isProcessing {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Progress Bar
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(currentStep.isEmpty ? "Processing..." : currentStep)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+
+                            Spacer()
+
+                            // Cancel Button
+                            Button(action: {
+                                Task {
+                                    await cancelProcessing()
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 12))
+                                    Text("Cancel")
+                                        .font(.system(size: 11, weight: .medium))
+                                }
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(4)
+                            }
+                            .buttonStyle(.plain)
+
+                            if totalFiles > 0 {
+                                Text("\(processedFiles)/\(totalFiles)")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                    .padding(.leading, 8)
+                            }
+                        }
+
+                        ProgressView(value: processingProgress)
+                            .progressViewStyle(LinearProgressViewStyle())
+                            .frame(height: 8)
+                    }
+
+                    // Current File Info
+                    if !currentFile.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+
+                            Text(currentFile)
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+
+                    // Status Message
+                    if !processingStatus.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 11))
+                                .foregroundColor(.blue)
+
+                            Text(processingStatus)
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(Color.blue.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                )
+                .cornerRadius(8)
+            }
+
             LazyVGrid(
                 columns: [
                     GridItem(.flexible()),
@@ -632,42 +719,225 @@ struct EditKnowledgeBaseView: View {
     }
 
     private func processKnowledgeBase() {
+        // Reset progress state
         isProcessing = true
-        processingStatus = NSLocalizedString("processing", bundle: .module, comment: "")
+        processingProgress = 0.0
+        currentFile = ""
+        totalFiles = 0
+        processedFiles = 0
+        currentStep = "Preparing..."
+        processingStatus = ""
 
-        // Simulate processing - in real implementation this would call actual processing services
         Task {
-            await MainActor.run {
-                switch knowledgeBase.type {
-                case .localFolder:
-                    processingStatus = NSLocalizedString(
-                        "indexing_files", bundle: .module, comment: "")
-                case .webSite:
-                    processingStatus = NSLocalizedString(
-                        "crawling_website", bundle: .module, comment: "")
-                case .enterpriseAPI:
-                    processingStatus = NSLocalizedString(
-                        "syncing_data", bundle: .module, comment: "")
+            do {
+                // Step 1: Save changes
+                await MainActor.run {
+                    currentStep = "Saving configuration..."
+                    processingProgress = 0.1
+                    saveChanges()
                 }
-            }
 
-            // Simulate work
-            try? await Task.sleep(nanoseconds: 3_000_000_000)  // 3 seconds
+                // Get the updated knowledge base
+                guard
+                    let updatedKB = manager.knowledgeBases.first(where: {
+                        $0.id == knowledgeBase.id
+                    })
+                else {
+                    throw ProcessingError.processingFailed("Knowledge base not found")
+                }
 
-            await MainActor.run {
-                isProcessing = false
-                processingStatus = ""
-                // Here you would update the knowledge base with actual results
+                // Step 2: Setup progress tracking
+                await MainActor.run {
+                    currentStep = "Initializing processing..."
+                    processingProgress = 0.2
+                }
+
+                // Get processing service and setup observers
+                let service = KnowledgeBaseService.shared
+
+                // Monitor processing progress
+                let progressTask = Task {
+                    while isProcessing {
+                        await MainActor.run {
+                            processingProgress = service.processingProgress
+                            processingStatus = service.processingStatus
+
+                            // Update step based on progress
+                            if processingProgress < 0.3 {
+                                currentStep = "Scanning files..."
+                            } else if processingProgress < 0.7 {
+                                currentStep = "Processing documents..."
+                            } else if processingProgress < 0.9 {
+                                currentStep = "Generating embeddings..."
+                            } else {
+                                currentStep = "Saving to vector database..."
+                            }
+                        }
+
+                        try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
+                    }
+                }
+
+                // Step 3: Call the actual processing service
+                await MainActor.run {
+                    currentStep = "Starting file processing..."
+                    processingProgress = 0.3
+                }
+
+                let result = try await service.processKnowledgeBase(updatedKB)
+
+                // Cancel progress monitoring
+                progressTask.cancel()
+
+                await MainActor.run {
+                    currentStep = "Updating knowledge base..."
+                    processingProgress = 0.95
+
+                    // Update the knowledge base with processing results
+                    var processedKB = updatedKB
+                    processedKB.totalDocuments = result.totalFiles
+                    processedKB.totalChunks = result.documents.reduce(0) { $0 + $1.chunks.count }
+                    processedKB.totalVectors = result.vectorCount
+                    processedKB.lastVectorized = Date()
+
+                    // Update the appropriate config timestamp based on type
+                    let currentDate = Date()
+                    switch processedKB.type {
+                    case .localFolder:
+                        processedKB.localFolderConfig?.lastIndexed = currentDate
+                        processedKB.localFolderConfig?.totalFiles = result.totalFiles
+                    case .webSite:
+                        processedKB.webSiteConfig?.lastCrawled = currentDate
+                        processedKB.webSiteConfig?.totalPages = result.totalFiles
+                    case .enterpriseAPI:
+                        processedKB.enterpriseAPIConfig?.lastSynced = currentDate
+                        processedKB.enterpriseAPIConfig?.totalDocuments = result.totalFiles
+                    }
+
+                    processedKB.updateTimestamp()
+                    manager.updateKnowledgeBase(processedKB)
+
+                    // Final step
+                    currentStep = "Completed successfully!"
+                    processingProgress = 1.0
+                    totalFiles = result.totalFiles
+                    processedFiles = result.processedFiles
+                    currentFile = ""
+
+                    processingStatus =
+                        "Processed \(result.processedFiles) files, created \(result.vectorCount) vectors"
+
+                    // Clear processing state after a delay
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)  // 3 seconds
+                        await MainActor.run {
+                            isProcessing = false
+                            processingProgress = 0.0
+                            currentStep = ""
+                            currentFile = ""
+                            processingStatus = ""
+                            totalFiles = 0
+                            processedFiles = 0
+                        }
+                    }
+                }
+
+            } catch {
+                await MainActor.run {
+                    isProcessing = false
+                    currentStep = "Error occurred"
+                    processingProgress = 0.0
+                    currentFile = ""
+                    totalFiles = 0
+                    processedFiles = 0
+                    processingStatus = "Failed: \(error.localizedDescription)"
+
+                    // Clear error message after a delay
+                    Task {
+                        try? await Task.sleep(nanoseconds: 8_000_000_000)  // 8 seconds
+                        await MainActor.run {
+                            processingStatus = ""
+                            currentStep = ""
+                        }
+                    }
+                }
+                print("Knowledge base processing failed: \(error)")
             }
         }
     }
 
     private func clearVectorData() {
-        // In real implementation, this would clear the vector database
-        var updatedKB = knowledgeBase
-        updatedKB.totalVectors = 0
-        updatedKB.lastVectorized = nil
-        manager.updateKnowledgeBase(updatedKB)
+        Task {
+            do {
+                // Call the actual service to clear vector data
+                try await KnowledgeBaseService.shared.clearKnowledgeBaseData(knowledgeBase)
+
+                await MainActor.run {
+                    // Update the knowledge base status
+                    var updatedKB = knowledgeBase
+                    updatedKB.totalDocuments = 0
+                    updatedKB.totalChunks = 0
+                    updatedKB.totalVectors = 0
+                    updatedKB.lastVectorized = nil
+
+                    // Clear the appropriate config timestamp based on type
+                    switch updatedKB.type {
+                    case .localFolder:
+                        updatedKB.localFolderConfig?.lastIndexed = nil
+                        updatedKB.localFolderConfig?.totalFiles = 0
+                    case .webSite:
+                        updatedKB.webSiteConfig?.lastCrawled = nil
+                        updatedKB.webSiteConfig?.totalPages = 0
+                    case .enterpriseAPI:
+                        updatedKB.enterpriseAPIConfig?.lastSynced = nil
+                        updatedKB.enterpriseAPIConfig?.totalDocuments = 0
+                    }
+
+                    updatedKB.updateTimestamp()
+
+                    manager.updateKnowledgeBase(updatedKB)
+                }
+
+            } catch {
+                print("Failed to clear vector data: \(error)")
+                await MainActor.run {
+                    processingStatus = "Failed to clear data: \(error.localizedDescription)"
+
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        await MainActor.run {
+                            processingStatus = ""
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func cancelProcessing() async {
+        await MainActor.run {
+            currentStep = "Cancelling..."
+            processingStatus = "Processing cancelled by user"
+        }
+
+        // Cancel the processing service
+        KnowledgeBaseService.shared.cancelProcessing()
+
+        await MainActor.run {
+            isProcessing = false
+            processingProgress = 0.0
+            currentStep = ""
+            currentFile = ""
+            totalFiles = 0
+            processedFiles = 0
+
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)  // 2 seconds
+                await MainActor.run {
+                    processingStatus = ""
+                }
+            }
+        }
     }
 }
 

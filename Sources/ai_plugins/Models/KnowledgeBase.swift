@@ -94,6 +94,8 @@ struct KnowledgeBase: Codable, Identifiable, Equatable {
 
     // Vector database info
     var vectorDatabasePath: String?
+    var totalDocuments: Int = 0
+    var totalChunks: Int = 0
     var totalVectors: Int = 0
     var lastVectorized: Date?
 

@@ -12,6 +12,10 @@ class KnowledgeBaseService: ObservableObject {
     @Published var currentKnowledgeBase: KnowledgeBase?
     @Published var processingProgress: Double = 0.0
     @Published var processingStatus = ""
+    @Published var currentFileName = ""
+    @Published var totalFiles = 0
+    @Published var processedFiles = 0
+    @Published var currentStep = ""
 
     // Processors
     private let localFolderProcessor = LocalFolderProcessor()
@@ -46,34 +50,54 @@ class KnowledgeBaseService: ObservableObject {
             currentKnowledgeBase = nil
             processingProgress = 0.0
             processingStatus = ""
+            currentFileName = ""
+            totalFiles = 0
+            processedFiles = 0
+            currentStep = ""
         }
 
         do {
             // 1. 验证配置
+            currentStep = "Validating configuration..."
+            processingProgress = 0.1
             try validateKnowledgeBaseConfiguration(knowledgeBase)
 
             // 2. 根据类型选择处理器
+            currentStep = "Processing files..."
+            processingProgress = 0.2
             let result: ProcessingResult
 
             switch knowledgeBase.type {
             case .localFolder:
+                // Setup file tracking
+                totalFiles = 0
+                processedFiles = 0
                 result = try await localFolderProcessor.processKnowledgeBase(knowledgeBase)
             case .webSite:
+                currentStep = "Crawling website..."
                 result = try await webCrawlerProcessor.processKnowledgeBase(knowledgeBase)
             case .enterpriseAPI:
+                currentStep = "Syncing from API..."
                 result = try await enterpriseAPIProcessor.processKnowledgeBase(knowledgeBase)
             }
 
             // 3. 处理向量化
             if !result.documents.isEmpty {
+                currentStep = "Generating embeddings..."
                 processingStatus = NSLocalizedString(
                     "vectorizing_documents", bundle: .module, comment: "")
+                totalFiles = result.documents.count
+                processedFiles = 0
                 try await vectorizeDocuments(result.documents, for: knowledgeBase)
             }
 
             // 4. 更新知识库信息
+            currentStep = "Updating knowledge base..."
+            processingProgress = 0.95
             try await updateKnowledgeBaseStats(knowledgeBase, result: result)
 
+            currentStep = "Completed!"
+            processingProgress = 1.0
             processingStatus = NSLocalizedString(
                 "processing_completed", bundle: .module, comment: "")
 
@@ -324,11 +348,21 @@ class KnowledgeBaseService: ObservableObject {
         var processedDocuments = 0
 
         for document in documents {
+            // Update current file being processed
+            currentFileName = document.title
+            processingStatus = "Processing: \(document.title)"
+
             try await vectorDBManager.storeDocument(document, in: knowledgeBase)
 
             processedDocuments += 1
-            processingProgress = 0.8 + (0.2 * Double(processedDocuments) / Double(totalDocuments))
+            processedFiles = processedDocuments
+
+            // Update progress: 0.3 (initial) + 0.6 (processing) + 0.1 (completion)
+            processingProgress = 0.3 + (0.6 * Double(processedDocuments) / Double(totalDocuments))
         }
+
+        currentFileName = ""
+        processingStatus = "Vector embeddings completed"
     }
 
     private func updateKnowledgeBaseStats(_ knowledgeBase: KnowledgeBase, result: ProcessingResult)

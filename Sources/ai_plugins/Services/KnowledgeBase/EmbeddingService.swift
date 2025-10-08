@@ -215,17 +215,54 @@ class EmbeddingService: ObservableObject {
         let hash = text.hash
         let dimension = getVectorDimension()
 
+        // Ensure we have a valid seed (avoid 0)
+        let seed = UInt64(abs(hash == 0 ? 12345 : hash))
+
         // Use seeded random number generator for consistency
-        var generator = SeededRandomNumberGenerator(seed: UInt64(abs(hash)))
+        var generator = SeededRandomNumberGenerator(seed: seed)
 
         var embedding: [Float] = []
-        for _ in 0..<dimension {
-            embedding.append(Float.random(in: -1...1, using: &generator))
+        for i in 0..<dimension {
+            // Generate values in a reasonable range and avoid all zeros
+            let value = Float.random(in: -1...1, using: &generator)
+            // Add a small bias to ensure not all values are zero
+            let biasedValue = value + Float(i % 3 - 1) * 0.01
+            embedding.append(biasedValue)
         }
 
-        // Normalize the vector
-        let norm = sqrt(embedding.map { $0 * $0 }.reduce(0, +))
-        return embedding.map { $0 / norm }
+        // Calculate norm with safety checks
+        let sumOfSquares = embedding.map { $0 * $0 }.reduce(0, +)
+
+        // Ensure norm is not zero or invalid
+        guard sumOfSquares > 0 && sumOfSquares.isFinite else {
+            print("Warning: Invalid embedding generated, using fallback")
+            // Return a simple valid normalized vector as fallback
+            let fallbackEmbedding = (0..<dimension).map { i in
+                Float(sin(Double(i) * 0.1)) * 0.5 + 0.5
+            }
+            let fallbackNorm = sqrt(fallbackEmbedding.map { $0 * $0 }.reduce(0, +))
+            return fallbackEmbedding.map { $0 / fallbackNorm }
+        }
+
+        let norm = sqrt(sumOfSquares)
+
+        // Additional safety check for the final result
+        let normalizedEmbedding = embedding.map { $0 / norm }
+
+        // Verify the result is valid
+        let hasValidValues = normalizedEmbedding.allSatisfy { $0.isFinite && !$0.isNaN }
+        guard hasValidValues else {
+            print("Error: Generated invalid normalized embedding, using fallback")
+            // Return a simple valid normalized vector as fallback
+            let fallbackEmbedding = (0..<dimension).map { i in
+                Float(cos(Double(i) * 0.1))
+            }
+            let fallbackNorm = sqrt(fallbackEmbedding.map { $0 * $0 }.reduce(0, +))
+            return fallbackEmbedding.map { $0 / fallbackNorm }
+        }
+
+        print("Generated mock embedding with norm: \(norm), dimension: \(dimension)")
+        return normalizedEmbedding
     }
 
     // MARK: - Utility Functions

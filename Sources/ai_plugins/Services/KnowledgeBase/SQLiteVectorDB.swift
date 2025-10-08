@@ -298,8 +298,31 @@ class SQLiteVectorDB: ObservableObject {
                 "Expected \(vectorDimension) dimensions, got \(embedding.count)")
         }
 
-        // Calculate L2 norm for faster similarity search
-        let norm = sqrt(embedding.map { $0 * $0 }.reduce(0, +))
+        // Calculate L2 norm for faster similarity search with safety checks
+        let sumOfSquares = embedding.map { $0 * $0 }.reduce(0, +)
+
+        // Verify the sum is valid
+        guard sumOfSquares > 0 && sumOfSquares.isFinite && !sumOfSquares.isNaN else {
+            print("Error: Invalid embedding sum of squares: \(sumOfSquares)")
+            throw VectorDBError.invalidEmbedding(
+                "Invalid embedding: sum of squares is \(sumOfSquares)")
+        }
+
+        let norm = sqrt(sumOfSquares)
+
+        // Verify the norm is valid
+        guard norm > 0 && norm.isFinite && !norm.isNaN else {
+            print("Error: Invalid norm calculated: \(norm)")
+            throw VectorDBError.invalidEmbedding("Invalid norm calculated: \(norm)")
+        }
+
+        // Verify all embedding values are finite
+        guard embedding.allSatisfy({ $0.isFinite && !$0.isNaN }) else {
+            print("Error: Embedding contains invalid values (NaN or infinite)")
+            throw VectorDBError.invalidEmbedding("Embedding contains NaN or infinite values")
+        }
+
+        print("Storing vector with norm: \(norm), dimension: \(embedding.count)")
 
         // Convert embedding to binary data
         let embeddingData = Data(
@@ -486,6 +509,8 @@ class SQLiteVectorDB: ObservableObject {
                     sqlite3_bind_int(stmt, bindIndex, Int32(intValue))
                 case let doubleValue as Double:
                     sqlite3_bind_double(stmt, bindIndex, doubleValue)
+                case let floatValue as Float:
+                    sqlite3_bind_double(stmt, bindIndex, Double(floatValue))
                 case let dataValue as Data:
                     _ = dataValue.withUnsafeBytes { bytes in
                         sqlite3_bind_blob(
@@ -549,6 +574,8 @@ class SQLiteVectorDB: ObservableObject {
                 sqlite3_bind_int(stmt, bindIndex, Int32(intValue))
             case let doubleValue as Double:
                 sqlite3_bind_double(stmt, bindIndex, doubleValue)
+            case let floatValue as Float:
+                sqlite3_bind_double(stmt, bindIndex, Double(floatValue))
             case let dataValue as Data:
                 _ = dataValue.withUnsafeBytes { bytes in
                     sqlite3_bind_blob(
@@ -590,7 +617,7 @@ enum VectorDBError: LocalizedError {
     case databaseError(String)
     case dimensionMismatch(String)
     case vectorNotFound
-    case invalidEmbedding
+    case invalidEmbedding(String)
 
     var errorDescription: String? {
         switch self {
@@ -600,8 +627,8 @@ enum VectorDBError: LocalizedError {
             return "Vector dimension error: \(message)"
         case .vectorNotFound:
             return "Vector not found"
-        case .invalidEmbedding:
-            return "Invalid embedding data"
+        case .invalidEmbedding(let message):
+            return "Invalid embedding data: \(message)"
         }
     }
 }
