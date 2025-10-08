@@ -320,39 +320,15 @@ class KnowledgeBaseService: ObservableObject {
     private func vectorizeDocuments(_ documents: [Document], for knowledgeBase: KnowledgeBase)
         async throws
     {
-        let totalChunks = documents.reduce(0) { $0 + $1.chunks.count }
-        var processedChunks = 0
+        let totalDocuments = documents.count
+        var processedDocuments = 0
 
         for document in documents {
-            for chunk in document.chunks {
-                // 这里应该调用实际的向量化服务
-                // 现在我们使用模拟的向量化
-                let embedding = try await generateEmbedding(for: chunk.content)
+            try await vectorDBManager.storeDocument(document, in: knowledgeBase)
 
-                // 存储向量
-                try await vectorDBManager.storeVector(
-                    id: chunk.id,
-                    embedding: embedding,
-                    content: chunk.content,
-                    metadata: chunk.metadata,
-                    in: knowledgeBase
-                )
-
-                processedChunks += 1
-                processingProgress = 0.8 + (0.2 * Double(processedChunks) / Double(totalChunks))
-            }
+            processedDocuments += 1
+            processingProgress = 0.8 + (0.2 * Double(processedDocuments) / Double(totalDocuments))
         }
-    }
-
-    private func generateEmbedding(for text: String) async throws -> [Float] {
-        // 这里应该调用实际的向量化服务，比如OpenAI的embedding API
-        // 现在返回模拟的向量
-
-        // 模拟API调用延迟
-        try await Task.sleep(nanoseconds: 100_000_000)  // 0.1秒
-
-        // 返回随机向量作为占位符（实际应该是1536维度的向量）
-        return (0..<384).map { _ in Float.random(in: -1...1) }
     }
 
     private func updateKnowledgeBaseStats(_ knowledgeBase: KnowledgeBase, result: ProcessingResult)
@@ -377,41 +353,116 @@ class KnowledgeBaseService: ObservableObject {
 
 @MainActor
 class VectorDatabaseManager {
+    private var databases: [String: SQLiteVectorDB] = [:]
+    private let embeddingService = EmbeddingService.shared
 
-    func storeVector(
-        id: String,
-        embedding: [Float],
-        content: String,
-        metadata: [String: String],
-        in knowledgeBase: KnowledgeBase
-    ) async throws {
-        // 实现向量存储逻辑
-        // 这里可以使用SQLite、Core Data或专门的向量数据库
+    func getDatabase(for knowledgeBase: KnowledgeBase) -> SQLiteVectorDB {
+        let kbId = knowledgeBase.id.uuidString
 
-        // 现在只是打印日志
-        print("存储向量: \(id) 在知识库 \(knowledgeBase.name)")
+        if let existingDB = databases[kbId] {
+            return existingDB
+        }
+
+        let dbPath = getDatabasePath(for: knowledgeBase)
+        let vectorDB = SQLiteVectorDB(
+            dbPath: dbPath,
+            vectorDimension: embeddingService.getVectorDimension()
+        )
+
+        databases[kbId] = vectorDB
+        return vectorDB
+    }
+
+    func storeDocument(_ document: Document, in knowledgeBase: KnowledgeBase) async throws {
+        let vectorDB = getDatabase(for: knowledgeBase)
+
+        // Create knowledge base entry if not exists
+        try await vectorDB.createKnowledgeBase(knowledgeBase)
+
+        // Generate embeddings for all chunks
+        for chunk in document.chunks {
+            if chunk.embedding == nil {
+                let embedding = try await embeddingService.generateEmbedding(for: chunk.content)
+                chunk.embedding = embedding
+            }
+        }
+
+        // Store document with embeddings
+        try await vectorDB.storeDocument(document, kbId: knowledgeBase.id.uuidString)
     }
 
     func getStats(for knowledgeBase: KnowledgeBase) async -> ProcessingStats? {
-        // 返回知识库的统计信息
-        return ProcessingStats(
-            documentCount: 0,
-            vectorCount: 0,
-            lastUpdated: Date(),
-            storageSize: 0
-        )
+        let vectorDB = getDatabase(for: knowledgeBase)
+
+        do {
+            if let stats = try await vectorDB.getKnowledgeBaseStats(id: knowledgeBase.id.uuidString)
+            {
+                return ProcessingStats(
+                    documentCount: stats.documentCount,
+                    vectorCount: stats.vectorCount,
+                    lastUpdated: stats.lastUpdated,
+                    storageSize: try await vectorDB.getStorageSize()
+                )
+            }
+        } catch {
+            print("Failed to get stats for knowledge base \(knowledgeBase.name): \(error)")
+        }
+
+        return nil
     }
 
     func clearDatabase(for knowledgeBase: KnowledgeBase) async throws {
-        // 清除知识库的所有向量数据
-        print("清除知识库数据: \(knowledgeBase.name)")
+        let vectorDB = getDatabase(for: knowledgeBase)
+        try await vectorDB.clearKnowledgeBase(id: knowledgeBase.id.uuidString)
     }
 
     func search(in knowledgeBase: KnowledgeBase, query: String, limit: Int) async throws
         -> [SearchResult]
     {
-        // 实现向量搜索逻辑
-        return []
+        let vectorDB = getDatabase(for: knowledgeBase)
+
+        // Generate embedding for query
+        let queryEmbedding = try await embeddingService.generateEmbedding(for: query)
+
+        // Search similar vectors
+        let results = try await vectorDB.searchSimilar(
+            query: queryEmbedding,
+            kbId: knowledgeBase.id.uuidString,
+            limit: limit
+        )
+
+        // Convert to SearchResult format
+        return results.map { result in
+            SearchResult(
+                id: result.chunkId,
+                content: result.content,
+                similarity: result.similarity,
+                metadata: result.metadata
+            )
+        }
+    }
+
+    func vacuum(for knowledgeBase: KnowledgeBase) async throws {
+        let vectorDB = getDatabase(for: knowledgeBase)
+        try await vectorDB.vacuum()
+    }
+
+    private func getDatabasePath(for knowledgeBase: KnowledgeBase) -> String {
+        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
+        let kbDataDir =
+            homeDirectory
+            .appendingPathComponent(".ai_plugins_data")
+            .appendingPathComponent("knowledge_bases")
+            .appendingPathComponent("vectors")
+            .appendingPathComponent(knowledgeBase.id.uuidString)
+
+        // Create directory if needed
+        try? FileManager.default.createDirectory(
+            at: kbDataDir,
+            withIntermediateDirectories: true
+        )
+
+        return kbDataDir.appendingPathComponent("vectors.db").path
     }
 }
 
@@ -421,7 +472,7 @@ struct ProcessingStats {
     let documentCount: Int
     let vectorCount: Int
     let lastUpdated: Date
-    let storageSize: Int  // 字节
+    let storageSize: Int64  // 字节
 }
 
 struct SearchResult {

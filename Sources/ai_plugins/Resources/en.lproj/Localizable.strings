@@ -206,3 +206,20 @@
 "vectorizing_documents" = "Vectorizing documents";
 "processing_completed" = "Processing completed";
 "processing_cancelled" = "Processing cancelled";
+
+/* Embedding Service */
+"embedding_service" = "Embedding Service";
+"embedding_settings" = "Embedding Service Settings";
+"embedding_settings_description" = "Configure document vectorization service, supporting OpenAI, local models and other options";
+"embedding_provider" = "Embedding Provider";
+"api_configuration" = "API Configuration";
+"api_key_info" = "Enter your OpenAI API key to use the embedding service";
+"get_openai_key" = "Get OpenAI API Key";
+"connection_test" = "Connection Test";
+"selected_provider" = "Selected Provider";
+"vector_dimension" = "Vector Dimension";
+"api_key_status" = "API Key Status";
+"not_configured" = "Not Configured";
+"configured" = "Configured";
+"requires_api_key" = "Requires API Key";
+"connection_failed" = "Connection Failed";

@@ -350,6 +350,8 @@ struct MainView: View {
             ModelSelectionView(settings: settings)
         case .knowledgeBase:
             KnowledgeBaseSettingsView(settings: settings)
+        case .embeddingService:
+            EmbeddingSettingsView(settings: settings)
         }
     }
 

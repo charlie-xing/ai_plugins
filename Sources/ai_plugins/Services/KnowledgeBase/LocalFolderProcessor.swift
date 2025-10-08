@@ -232,7 +232,8 @@ class LocalFolderProcessor: ObservableObject {
                     documentId: document.id,
                     content: chunk,
                     chunkIndex: index,
-                    metadata: document.metadata
+                    metadata: document.metadata,
+                    embedding: nil
                 )
             }
 
@@ -343,13 +344,25 @@ class Document: ObservableObject {
     }
 }
 
-struct DocumentChunk {
+class DocumentChunk: ObservableObject {
     let id: String
     let documentId: String
     let content: String
     let chunkIndex: Int
     let metadata: [String: String]
     var embedding: [Float]?
+
+    init(
+        id: String, documentId: String, content: String, chunkIndex: Int,
+        metadata: [String: String], embedding: [Float]? = nil
+    ) {
+        self.id = id
+        self.documentId = documentId
+        self.content = content
+        self.chunkIndex = chunkIndex
+        self.metadata = metadata
+        self.embedding = embedding
+    }
 }
 
 enum DocumentType: String, CaseIterable {

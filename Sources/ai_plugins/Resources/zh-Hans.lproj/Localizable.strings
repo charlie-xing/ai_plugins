@@ -206,3 +206,20 @@
 "vectorizing_documents" = "正在向量化文档";
 "processing_completed" = "处理完成";
 "processing_cancelled" = "处理已取消";
+
+/* Embedding Service */
+"embedding_service" = "向量服务";
+"embedding_settings" = "向量服务设置";
+"embedding_settings_description" = "配置文档向量化服务，支持OpenAI、本地模型等多种选择";
+"embedding_provider" = "向量化提供商";
+"api_configuration" = "API配置";
+"api_key_info" = "请输入您的OpenAI API密钥以使用向量化服务";
+"get_openai_key" = "获取OpenAI API密钥";
+"connection_test" = "连接测试";
+"selected_provider" = "当前提供商";
+"vector_dimension" = "向量维度";
+"api_key_status" = "API密钥状态";
+"not_configured" = "未配置";
+"configured" = "已配置";
+"requires_api_key" = "需要API密钥";
+"connection_failed" = "连接失败";

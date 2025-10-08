@@ -6,6 +6,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case inputMethod = "Input Method"
     case modelSelection = "Model Selection"
     case knowledgeBase = "Knowledge Base"
+    case embeddingService = "Embedding Service"
 
     var id: String { rawValue }
 
@@ -19,6 +20,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return "cpu.fill"
         case .knowledgeBase:
             return "book.fill"
+        case .embeddingService:
+            return "brain.head.profile"
         }
     }
 
@@ -32,6 +35,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return "model_selection"
         case .knowledgeBase:
             return "knowledge_base"
+        case .embeddingService:
+            return "embedding_service"
         }
     }
 }
