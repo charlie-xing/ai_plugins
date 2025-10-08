@@ -164,41 +164,60 @@ struct KnowledgeBaseSelectionView: View {
             // Header
             HStack {
                 Text("Select Knowledge Base")
-                    .font(.headline)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.primary)
 
                 Spacer()
 
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
+                    Image(systemName: "xmark")
                         .foregroundColor(.secondary)
-                        .font(.system(size: 16))
+                        .font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.plain)
+                .opacity(0.7)
+                .scaleEffect(0.9)
+                .onHover { hovering in
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        // Add subtle hover animation
+                    }
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color.primary.opacity(0.03))
 
             Divider()
+                .opacity(0.3)
 
             // Knowledge Base List
             if knowledgeBases.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: "books.vertical")
-                        .font(.system(size: 32))
-                        .foregroundColor(.secondary)
+                    ZStack {
+                        Circle()
+                            .fill(.tertiary.opacity(0.3))
+                            .frame(width: 48, height: 48)
 
-                    Text("No Ready Knowledge Bases")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        Image(systemName: "books.vertical")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .opacity(0.7)
+                    }
 
-                    Text("Create and configure knowledge bases in Settings")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    VStack(spacing: 4) {
+                        Text("No Knowledge Bases")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.primary)
+
+                        Text("Create one in Settings to get started")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .opacity(0.85)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
+                .padding(.vertical, 28)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -213,7 +232,8 @@ struct KnowledgeBaseSelectionView: View {
                         )
 
                         Divider()
-                            .padding(.leading, 48)
+                            .padding(.leading, 36)
+                            .opacity(0.3)
 
                         // Knowledge bases
                         ForEach(knowledgeBases) { kb in
@@ -228,18 +248,38 @@ struct KnowledgeBaseSelectionView: View {
 
                             if kb.id != knowledgeBases.last?.id {
                                 Divider()
-                                    .padding(.leading, 48)
+                                    .padding(.leading, 36)
+                                    .opacity(0.3)
                             }
                         }
                     }
                 }
-                .frame(maxHeight: 300)
+                .frame(maxHeight: 250)
             }
         }
-        .frame(width: 320)
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
-        .shadow(radius: 8)
+        .frame(width: 300)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.regularMaterial, style: FillStyle())
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(.quaternary, lineWidth: 0.5)
+                )
+        )
+        .shadow(color: .black.opacity(0.08), radius: 20, x: 0, y: 8)
+        .shadow(color: .black.opacity(0.04), radius: 1, x: 0, y: 1)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.5
+                )
+                .blendMode(.overlay)
+        )
     }
 }
 
@@ -249,50 +289,119 @@ struct KnowledgeBaseSelectionRow: View {
     let isSelected: Bool
     let onSelect: () -> Void
 
+    @State private var isHovered = false
+
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
-                // Icon
-                Image(systemName: knowledgeBase?.type.icon ?? "xmark.circle")
-                    .font(.system(size: 20))
-                    .foregroundColor(knowledgeBase != nil ? .accentColor : .secondary)
-                    .frame(width: 24, height: 24)
+                // Icon with subtle background
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(
+                            knowledgeBase != nil
+                                ? LinearGradient(
+                                    colors: [
+                                        Color.accentColor.opacity(0.15),
+                                        Color.accentColor.opacity(0.05),
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                : LinearGradient(
+                                    colors: [
+                                        Color.secondary.opacity(0.08),
+                                        Color.secondary.opacity(0.04),
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                        )
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7)
+                                .strokeBorder(.quaternary.opacity(0.5), lineWidth: 0.5)
+                        )
+
+                    Image(systemName: knowledgeBase?.type.icon ?? "xmark.circle")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(knowledgeBase != nil ? .accentColor : .secondary)
+                }
 
                 // Info
                 VStack(alignment: .leading, spacing: 2) {
                     Text(knowledgeBase?.name ?? "None")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.primary)
                         .lineLimit(1)
 
                     if let kb = knowledgeBase {
                         Text("\(kb.totalDocuments) documents • \(kb.totalChunks) chunks")
-                            .font(.caption)
+                            .font(.system(size: 11, weight: .regular))
                             .foregroundColor(.secondary)
+                            .opacity(0.85)
                     } else {
                         Text("No knowledge base selected")
-                            .font(.caption)
+                            .font(.system(size: 11, weight: .regular))
                             .foregroundColor(.secondary)
+                            .opacity(0.85)
                     }
                 }
 
                 Spacer()
 
-                // Selection indicator
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.accentColor)
-                        .font(.system(size: 18))
+                // Selection indicator with animation
+                ZStack {
+                    if isSelected {
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 20, height: 20)
+                            .scaleEffect(isSelected ? 1.0 : 0.1)
+
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .scaleEffect(isSelected ? 1.0 : 0.1)
+                    }
                 }
+                .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isSelected)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background(
-            isSelected ? Color.accentColor.opacity(0.1) : Color.clear
+            RoundedRectangle(cornerRadius: 10)
+                .fill(
+                    isSelected
+                        ? LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(0.12), Color.accentColor.opacity(0.06),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        : (isHovered
+                            ? LinearGradient(
+                                colors: [Color.primary.opacity(0.06), Color.primary.opacity(0.02)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [Color.clear], startPoint: .top, endPoint: .bottom))
+                )
+                .overlay(
+                    isSelected
+                        ? RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 0.5)
+                        : nil
+                )
+                .animation(.easeInOut(duration: 0.2), value: isHovered)
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
         )
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
