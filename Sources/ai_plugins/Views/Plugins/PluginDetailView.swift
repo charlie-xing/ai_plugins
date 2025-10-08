@@ -93,6 +93,7 @@ struct PluginDetailView: View {
     @ObservedObject var viewModel: MainViewModel
     @ObservedObject var historyManager: HistoryManager
     @State private var sharedPrompt: String = ""
+    @State private var selectedKnowledgeBase: KnowledgeBase?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -113,7 +114,7 @@ struct PluginDetailView: View {
 
                 // Chrome-style tab width calculation
                 let maxTabWidth: CGFloat = 200  // Maximum width for a single tab
-                let minTabWidth: CGFloat = 50   // Minimum width (icon + close button only)
+                let minTabWidth: CGFloat = 50  // Minimum width (icon + close button only)
                 let compactThreshold: CGFloat = 80  // Below this, hide text
 
                 let (tabWidth, showText) = {
@@ -165,12 +166,14 @@ struct PluginDetailView: View {
             if let activeTab = viewModel.activeTab {
                 ExpandableTextInput(
                     text: $sharedPrompt,
+                    selectedKnowledgeBase: $selectedKnowledgeBase,
                     placeholder: NSLocalizedString("enter_prompt", bundle: .module, comment: ""),
                     onSend: {
                         print("PluginDetailView: onSend triggered for tab: \(activeTab.id)")
                         if !sharedPrompt.isEmpty {
                             activeTab.viewModel.prompt = sharedPrompt
-                            activeTab.viewModel.runPlugin(plugin: activeTab.plugin)
+                            activeTab.viewModel.runPlugin(
+                                plugin: activeTab.plugin, knowledgeBase: selectedKnowledgeBase)
                             sharedPrompt = ""
                         }
                     }

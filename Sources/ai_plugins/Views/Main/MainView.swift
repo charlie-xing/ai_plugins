@@ -352,6 +352,8 @@ struct MainView: View {
             KnowledgeBaseSettingsView(settings: settings)
         case .embeddingService:
             EmbeddingSettingsView(settings: settings)
+        case .ragConfiguration:
+            RAGSettingsView()
         }
     }
 

@@ -1,17 +1,20 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// Multi-line expandable text input with toolbar
 struct ExpandableTextInput: View {
     @Binding var text: String
-    @State private var textHeight: CGFloat = 44 // Single line height
+    @Binding var selectedKnowledgeBase: KnowledgeBase?
+    @State private var textHeight: CGFloat = 44  // Single line height
     @State private var isDisabled: Bool = false
+    @State private var showingKnowledgeBaseSelection = false
+    @ObservedObject private var knowledgeBaseManager = KnowledgeBaseManager()
 
     let placeholder: String
     let onSend: () -> Void
 
     private let minHeight: CGFloat = 44  // 2 lines (adjusted for proper sizing)
-    private let maxHeight: CGFloat = 110 // 5 lines (adjusted for proper sizing)
+    private let maxHeight: CGFloat = 110  // 5 lines (adjusted for proper sizing)
     private let lineHeight: CGFloat = 22
 
     var body: some View {
@@ -54,8 +57,24 @@ struct ExpandableTextInput: View {
                         // TODO: Implement attachment
                     }
 
-                    ToolbarButton(icon: "books.vertical", tooltip: "Select knowledge base") {
-                        // TODO: Implement knowledge base
+                    ToolbarButton(
+                        icon: selectedKnowledgeBase != nil
+                            ? "books.vertical.fill" : "books.vertical",
+                        tooltip: selectedKnowledgeBase?.name ?? "Select knowledge base",
+                        isSelected: selectedKnowledgeBase != nil
+                    ) {
+                        showingKnowledgeBaseSelection.toggle()
+                    }
+                    .popover(isPresented: $showingKnowledgeBaseSelection) {
+                        KnowledgeBaseSelectionView(
+                            knowledgeBases: knowledgeBaseManager.knowledgeBases.filter {
+                                $0.displayStatus == .ready
+                            },
+                            selectedKnowledgeBase: $selectedKnowledgeBase,
+                            onDismiss: {
+                                showingKnowledgeBaseSelection = false
+                            }
+                        )
                     }
 
                     ToolbarButton(icon: "globe", tooltip: "Web search") {
@@ -105,21 +124,175 @@ struct ExpandableTextInput: View {
 struct ToolbarButton: View {
     let icon: String
     let tooltip: String
+    let isSelected: Bool
     let action: () -> Void
+
+    init(icon: String, tooltip: String, isSelected: Bool = false, action: @escaping () -> Void) {
+        self.icon = icon
+        self.tooltip = tooltip
+        self.isSelected = isSelected
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(.secondary)
+                .foregroundColor(isSelected ? .accentColor : .secondary)
                 .frame(width: 32, height: 32)
                 .background(
                     Circle()
-                        .fill(Color(NSColor.controlBackgroundColor))
+                        .fill(
+                            isSelected
+                                ? Color.accentColor.opacity(0.2)
+                                : Color(NSColor.controlBackgroundColor))
                 )
         }
         .buttonStyle(.plain)
         .help(tooltip)
+    }
+}
+
+/// Knowledge Base Selection View
+struct KnowledgeBaseSelectionView: View {
+    let knowledgeBases: [KnowledgeBase]
+    @Binding var selectedKnowledgeBase: KnowledgeBase?
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                Text("Select Knowledge Base")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 16))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            Divider()
+
+            // Knowledge Base List
+            if knowledgeBases.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "books.vertical")
+                        .font(.system(size: 32))
+                        .foregroundColor(.secondary)
+
+                    Text("No Ready Knowledge Bases")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+
+                    Text("Create and configure knowledge bases in Settings")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // None option
+                        KnowledgeBaseSelectionRow(
+                            knowledgeBase: nil,
+                            isSelected: selectedKnowledgeBase == nil,
+                            onSelect: {
+                                selectedKnowledgeBase = nil
+                                onDismiss()
+                            }
+                        )
+
+                        Divider()
+                            .padding(.leading, 48)
+
+                        // Knowledge bases
+                        ForEach(knowledgeBases) { kb in
+                            KnowledgeBaseSelectionRow(
+                                knowledgeBase: kb,
+                                isSelected: selectedKnowledgeBase?.id == kb.id,
+                                onSelect: {
+                                    selectedKnowledgeBase = kb
+                                    onDismiss()
+                                }
+                            )
+
+                            if kb.id != knowledgeBases.last?.id {
+                                Divider()
+                                    .padding(.leading, 48)
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 300)
+            }
+        }
+        .frame(width: 320)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .shadow(radius: 8)
+    }
+}
+
+/// Knowledge Base Selection Row
+struct KnowledgeBaseSelectionRow: View {
+    let knowledgeBase: KnowledgeBase?
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 12) {
+                // Icon
+                Image(systemName: knowledgeBase?.type.icon ?? "xmark.circle")
+                    .font(.system(size: 20))
+                    .foregroundColor(knowledgeBase != nil ? .accentColor : .secondary)
+                    .frame(width: 24, height: 24)
+
+                // Info
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(knowledgeBase?.name ?? "None")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+
+                    if let kb = knowledgeBase {
+                        Text("\(kb.totalDocuments) documents • \(kb.totalChunks) chunks")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("No knowledge base selected")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Selection indicator
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 18))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(
+            isSelected ? Color.accentColor.opacity(0.1) : Color.clear
+        )
     }
 }
 
@@ -129,7 +302,7 @@ class CustomTextView: NSTextView {
 
     override func keyDown(with event: NSEvent) {
         // Check for Command+Enter
-        if event.keyCode == 36 && event.modifierFlags.contains(.command) { // 36 = Return key
+        if event.keyCode == 36 && event.modifierFlags.contains(.command) {  // 36 = Return key
             print("CustomTextView: Command+Enter detected via keyDown")
             onCommandEnter?()
             return
@@ -192,7 +365,8 @@ struct ExpandableTextEditor: NSViewRepresentable {
         // Configure text container - DON'T set containerSize, let it auto-resize
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.heightTracksTextView = false
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
 
@@ -211,8 +385,10 @@ struct ExpandableTextEditor: NSViewRepresentable {
         if textView.frame.width == 0 {
             let scrollWidth = scrollView.frame.width
             if scrollWidth > 0 {
-                textView.frame = NSRect(x: 0, y: 0, width: scrollWidth, height: textView.frame.height)
-                textView.textContainer?.containerSize = NSSize(width: scrollWidth, height: .greatestFiniteMagnitude)
+                textView.frame = NSRect(
+                    x: 0, y: 0, width: scrollWidth, height: textView.frame.height)
+                textView.textContainer?.containerSize = NSSize(
+                    width: scrollWidth, height: .greatestFiniteMagnitude)
             }
         }
 
@@ -235,7 +411,7 @@ struct ExpandableTextEditor: NSViewRepresentable {
 
         layoutManager?.ensureLayout(for: textContainer!)
         let usedRect = layoutManager?.usedRect(for: textContainer!)
-        let newHeight = (usedRect?.height ?? 0) + 24 // Add padding
+        let newHeight = (usedRect?.height ?? 0) + 24  // Add padding
 
         DispatchQueue.main.async {
             self.height = max(minHeight, min(newHeight, maxHeight))
@@ -262,7 +438,9 @@ struct ExpandableTextEditor: NSViewRepresentable {
             // Command + Enter to send
             if commandSelector == #selector(NSResponder.insertNewline(_:)) {
                 let event = NSApp.currentEvent
-                print("ExpandableTextInput: insertNewline detected, modifierFlags: \(String(describing: event?.modifierFlags))")
+                print(
+                    "ExpandableTextInput: insertNewline detected, modifierFlags: \(String(describing: event?.modifierFlags))"
+                )
 
                 if event?.modifierFlags.contains(.command) == true {
                     print("ExpandableTextInput: Command+Enter detected, triggering onSend")

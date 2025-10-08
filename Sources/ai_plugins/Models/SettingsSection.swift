@@ -7,6 +7,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case modelSelection = "Model Selection"
     case knowledgeBase = "Knowledge Base"
     case embeddingService = "Embedding Service"
+    case ragConfiguration = "RAG Configuration"
 
     var id: String { rawValue }
 
@@ -22,6 +23,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return "book.fill"
         case .embeddingService:
             return "brain.head.profile"
+        case .ragConfiguration:
+            return "brain.head.profile.fill"
         }
     }
 
@@ -37,6 +40,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return "knowledge_base"
         case .embeddingService:
             return "embedding_service"
+        case .ragConfiguration:
+            return "rag_configuration"
         }
     }
 }

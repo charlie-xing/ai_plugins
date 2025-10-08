@@ -56,12 +56,16 @@ class EmbeddingService: ObservableObject {
         isProcessing = true
         defer { isProcessing = false }
 
-        switch currentProvider {
+        // Smart provider selection: prefer real embedding over mock
+        let effectiveProvider = getEffectiveProvider()
+
+        switch effectiveProvider {
         case .openAI, .openAISmall:
             return try await generateOpenAIEmbedding(text: text)
         case .local:
             return try await generateLocalEmbedding(text: text)
         case .mock:
+            print("Warning: Using mock embeddings - RAG functionality may not work properly")
             return generateMockEmbedding(text: text)
         }
     }
@@ -203,11 +207,10 @@ class EmbeddingService: ObservableObject {
     }
 
     private func generateLocalEmbedding(text: String) async throws -> [Float] {
-        // Placeholder for local embedding model
-        // In a real implementation, this would use a local ML model like sentence-transformers
-        // For now, we'll return a mock embedding
-        print("Local embedding not yet implemented, using mock embedding")
-        return generateMockEmbedding(text: text)
+        // Try to use a simple but consistent local embedding
+        // This creates embeddings based on text characteristics
+        print("Using simple local embedding implementation")
+        return generateSimpleEmbedding(text: text)
     }
 
     private func generateMockEmbedding(text: String) -> [Float] {
@@ -318,6 +321,82 @@ class EmbeddingService: ObservableObject {
         let userDefaults = UserDefaults.standard
         userDefaults.set(currentProvider.rawValue, forKey: "EmbeddingProvider")
         userDefaults.set(apiKey, forKey: "EmbeddingAPIKey")
+    }
+
+    // MARK: - Smart Provider Selection
+
+    private func getEffectiveProvider() -> EmbeddingProvider {
+        // If OpenAI is selected and we have an API key, use it
+        if (currentProvider == .openAI || currentProvider == .openAISmall) && !apiKey.isEmpty {
+            return currentProvider
+        }
+
+        // If local is explicitly selected, use it
+        if currentProvider == .local {
+            return .local
+        }
+
+        // If no API key but OpenAI is selected, fall back to local
+        if (currentProvider == .openAI || currentProvider == .openAISmall) && apiKey.isEmpty {
+            print("No OpenAI API key configured, falling back to local embedding")
+            return .local
+        }
+
+        // Default to local for better results than mock
+        return currentProvider == .mock ? .mock : .local
+    }
+
+    private func generateSimpleEmbedding(text: String) -> [Float] {
+        let dimension = getVectorDimension()
+        let cleanText = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Create a more meaningful embedding based on text characteristics
+        var embedding: [Float] = []
+
+        // Use text length, character frequencies, and word patterns
+        let textLength = Float(cleanText.count)
+        let words = cleanText.components(separatedBy: .whitespacesAndNewlines).filter {
+            !$0.isEmpty
+        }
+        let avgWordLength =
+            words.isEmpty ? 0.0 : Float(words.map { $0.count }.reduce(0, +)) / Float(words.count)
+
+        // Create feature vector based on text characteristics
+        for i in 0..<dimension {
+            let feature = Float(i)
+            var value: Float
+
+            if i < 50 {
+                // Length-based features
+                value = sin(textLength * 0.01 + feature * 0.1)
+            } else if i < 100 {
+                // Word-based features
+                value = cos(avgWordLength * 0.1 + feature * 0.05)
+            } else if i < 200 {
+                // Character frequency features
+                let charIndex = i - 100
+                if charIndex < cleanText.count {
+                    let char = cleanText[cleanText.index(cleanText.startIndex, offsetBy: charIndex)]
+                    value = Float(char.asciiValue ?? 65) / 128.0 - 1.0
+                } else {
+                    value = 0.0
+                }
+            } else {
+                // Hash-based features for consistency
+                let hash = (cleanText.hashValue ^ i).hashValue
+                value = Float(hash % 1000) / 500.0 - 1.0
+            }
+
+            embedding.append(value * 0.1)  // Scale down to reasonable range
+        }
+
+        // Normalize the embedding
+        let sumOfSquares = embedding.map { $0 * $0 }.reduce(0, +)
+        let norm = sqrt(max(sumOfSquares, 0.001))  // Avoid division by zero
+        let normalizedEmbedding = embedding.map { $0 / norm }
+
+        print("Generated simple embedding with dimension: \(dimension)")
+        return normalizedEmbedding
     }
 }
 

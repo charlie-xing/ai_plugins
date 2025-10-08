@@ -362,6 +362,10 @@ class SQLiteVectorDB: ObservableObject {
 
         let queryNorm = sqrt(query.map { $0 * $0 }.reduce(0, +))
 
+        print("SQLiteVectorDB: Searching for similar vectors")
+        print("SQLiteVectorDB: Query dimension: \(query.count), norm: \(queryNorm)")
+        print("SQLiteVectorDB: KB ID: \(kbId), limit: \(limit), minSimilarity: \(minSimilarity)")
+
         let sql = """
                 SELECT
                     v.chunk_id,
@@ -392,7 +396,11 @@ class SQLiteVectorDB: ObservableObject {
 
             sqlite3_bind_text(stmt, 1, kbId, -1, nil)
 
+            var totalVectors = 0
+            var validSimilarities: [Float] = []
+
             while sqlite3_step(stmt) == SQLITE_ROW {
+                totalVectors += 1
                 guard let embeddingBlob = sqlite3_column_blob(stmt, 1) else { continue }
 
                 let embeddingSize = sqlite3_column_bytes(stmt, 1)
@@ -409,6 +417,8 @@ class SQLiteVectorDB: ObservableObject {
                 // Calculate cosine similarity
                 let dotProduct = zip(query, embedding).map(*).reduce(0, +)
                 let similarity = Float(dotProduct / (queryNorm * Float(norm)))
+
+                validSimilarities.append(similarity)
 
                 if similarity >= minSimilarity {
                     let chunkId = String(cString: sqlite3_column_text(stmt, 0))
@@ -441,6 +451,20 @@ class SQLiteVectorDB: ObservableObject {
             // Sort by similarity (descending) and limit results
             results.sort { $0.similarity > $1.similarity }
             let limitedResults = Array(results.prefix(limit))
+
+            print("SQLiteVectorDB: Found \(totalVectors) total vectors in database")
+            if validSimilarities.isEmpty {
+                print("SQLiteVectorDB: No vectors found - database may be empty")
+            } else {
+                let maxSimilarity = validSimilarities.max() ?? 0.0
+                let minCalculatedSimilarity = validSimilarities.min() ?? 0.0
+                print(
+                    "SQLiteVectorDB: Similarity range: \(minCalculatedSimilarity) to \(maxSimilarity)"
+                )
+                print(
+                    "SQLiteVectorDB: Results above threshold (\(minSimilarity)): \(results.count)")
+            }
+            print("SQLiteVectorDB: Returning \(limitedResults.count) results")
 
             continuation.resume(returning: limitedResults)
         }

@@ -152,6 +152,19 @@ class KnowledgeBaseService: ObservableObject {
         return try await vectorDBManager.search(in: knowledgeBase, query: query, limit: limit)
     }
 
+    /// Force re-indexing of a knowledge base (clears existing vectors and re-processes)
+    func forceReindexKnowledgeBase(_ knowledgeBase: KnowledgeBase) async throws {
+        print("KnowledgeBaseService: Starting forced re-indexing of '\(knowledgeBase.name)'")
+
+        // Clear existing vector data
+        try await vectorDBManager.clearDatabase(for: knowledgeBase)
+
+        // Re-process the knowledge base
+        let _ = try await processKnowledgeBase(knowledgeBase)
+
+        print("KnowledgeBaseService: Completed forced re-indexing of '\(knowledgeBase.name)'")
+    }
+
     // MARK: - Private Methods
 
     private func setupProcessorObservers() {
@@ -458,11 +471,12 @@ class VectorDatabaseManager {
         // Generate embedding for query
         let queryEmbedding = try await embeddingService.generateEmbedding(for: query)
 
-        // Search similar vectors
+        // Search similar vectors with low threshold - let RAGService filter
         let results = try await vectorDB.searchSimilar(
             query: queryEmbedding,
             kbId: knowledgeBase.id.uuidString,
-            limit: limit
+            limit: limit * 2,  // Get more results for filtering
+            minSimilarity: 0.1  // Lower threshold, RAGService will filter
         )
 
         // Convert to SearchResult format

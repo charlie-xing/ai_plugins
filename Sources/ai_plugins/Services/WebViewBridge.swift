@@ -1,6 +1,6 @@
+import AppKit
 import Foundation
 import WebKit
-import AppKit
 
 /// Bridge between WKWebView JavaScript and Swift
 /// Replaces JSCore-based JSBridge with a simpler WKWebView-only approach
@@ -18,9 +18,12 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
 
     // MARK: - WKScriptMessageHandler
 
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+    func userContentController(
+        _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
+    ) {
         guard let body = message.body as? [String: Any],
-              let action = body["action"] as? String else {
+            let action = body["action"] as? String
+        else {
             print("WebViewBridge: Invalid message format")
             return
         }
@@ -34,22 +37,19 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
             }
 
         case "callAIStream":
-            // Accept both old format (single message) and new format (message history)
-            if let messages = body["messages"] as? [[String: Any]] {
-                handleStreamRequest(messages: messages)
-            } else if let userMessage = body["message"] as? String {
-                // Fallback to old single-message format
-                let singleMessage = [["role": "user", "content": userMessage]]
-                handleStreamRequest(messages: singleMessage)
-            }
+            // Handle both current message and conversation history
+            let messages = body["messages"] as? [[String: Any]] ?? []
+            let currentMessage = body["message"] as? String
+            handleStreamRequest(messages: messages, currentMessage: currentMessage)
 
         case "getSettings":
             handleGetSettings()
 
         case "executeCode":
             if let command = body["command"] as? String,
-               let args = body["args"] as? [String],
-               let callbackId = body["callbackId"] as? String {
+                let args = body["args"] as? [String],
+                let callbackId = body["callbackId"] as? String
+            {
                 handleExecuteCode(command: command, args: args, callbackId: callbackId)
             }
 
@@ -87,43 +87,54 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
 
                 Task { @MainActor in
                     if exitCode == 0 {
-                        self?.callExecuteCallback(callbackId: callbackId, success: true, output: output)
+                        self?.callExecuteCallback(
+                            callbackId: callbackId, success: true, output: output)
                     } else {
                         let errorMessage = error.isEmpty ? "Exit code: \(exitCode)" : error
-                        self?.callExecuteCallback(callbackId: callbackId, success: false, output: errorMessage)
+                        self?.callExecuteCallback(
+                            callbackId: callbackId, success: false, output: errorMessage)
                     }
                 }
             } catch {
                 Task { @MainActor in
-                    self?.callExecuteCallback(callbackId: callbackId, success: false, output: error.localizedDescription)
+                    self?.callExecuteCallback(
+                        callbackId: callbackId, success: false, output: error.localizedDescription)
                 }
             }
         }
     }
 
     private func callExecuteCallback(callbackId: String, success: Bool, output: String) {
-        let escapedOutput = output
+        let escapedOutput =
+            output
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
             .replacingOccurrences(of: "\n", with: "\\n")
             .replacingOccurrences(of: "\r", with: "\\r")
 
         let script = """
-        (function() {
-            if (window.executeCallbacks && window.executeCallbacks['\(callbackId)']) {
-                window.executeCallbacks['\(callbackId)'](\(success), '\(escapedOutput)');
-                delete window.executeCallbacks['\(callbackId)'];
-            }
-        })();
-        """
+            (function() {
+                if (window.executeCallbacks && window.executeCallbacks['\(callbackId)']) {
+                    window.executeCallbacks['\(callbackId)'](\(success), '\(escapedOutput)');
+                    delete window.executeCallbacks['\(callbackId)'];
+                }
+            })();
+            """
         callJavaScript(script)
     }
 
-    private func handleStreamRequest(messages: [[String: Any]]) {
+    private func handleStreamRequest(messages: [[String: Any]], currentMessage: String?) {
         guard let settings = settings,
-              let activeProvider = settings.aiProviders.first(where: { $0.id == settings.activeProviderId }),
-              let selectedModel = settings.availableModels.first(where: { $0.id == settings.selectedModelId }) else {
-            callJavaScript("window.onStreamError?.('Please configure AI provider and select a model in Settings first.')")
+            let activeProvider = settings.aiProviders.first(where: {
+                $0.id == settings.activeProviderId
+            }),
+            let selectedModel = settings.availableModels.first(where: {
+                $0.id == settings.selectedModelId
+            })
+        else {
+            callJavaScript(
+                "window.onStreamError?.('Please configure AI provider and select a model in Settings first.')"
+            )
             return
         }
 
@@ -133,7 +144,25 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
-        print("WebViewBridge: Starting stream to \(endpoint) with \(messages.count) messages in context")
+        // Build final messages array including current message (which may be RAG-enhanced)
+        var finalMessages = messages
+        if let currentMessage = currentMessage, !currentMessage.isEmpty {
+            finalMessages.append(["role": "user", "content": currentMessage])
+
+            // Log RAG enhancement info
+            if currentMessage.contains("Based on the following relevant information") {
+                print("WebViewBridge: Using RAG-enhanced prompt (length: \(currentMessage.count))")
+                print(
+                    "WebViewBridge: Enhanced prompt preview: \(String(currentMessage.prefix(200)))..."
+                )
+            } else {
+                print("WebViewBridge: Using original prompt (length: \(currentMessage.count))")
+            }
+        }
+
+        print(
+            "WebViewBridge: Starting stream to \(endpoint) with \(finalMessages.count) total messages (\(messages.count) history + current)"
+        )
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -143,17 +172,18 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
 
         let requestBody: [String: Any] = [
             "model": selectedModel.id,
-            "messages": messages,  // Use full conversation history
+            "messages": finalMessages,  // Use full conversation history + current message
             "temperature": 0.7,
             "max_tokens": 2000,
-            "stream": true
+            "stream": true,
         ]
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
             let delegate = StreamingDelegate(bridge: self)
-            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            let session = URLSession(
+                configuration: .default, delegate: delegate, delegateQueue: nil)
             session.dataTask(with: request).resume()
 
         } catch {
@@ -163,8 +193,13 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
 
     private func handleGetSettings() {
         guard let settings = settings,
-              let activeProvider = settings.aiProviders.first(where: { $0.id == settings.activeProviderId }),
-              let selectedModel = settings.availableModels.first(where: { $0.id == settings.selectedModelId }) else {
+            let activeProvider = settings.aiProviders.first(where: {
+                $0.id == settings.activeProviderId
+            }),
+            let selectedModel = settings.availableModels.first(where: {
+                $0.id == settings.selectedModelId
+            })
+        else {
             callJavaScript("window.onSettings?.({})")
             return
         }
@@ -173,9 +208,10 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
         var avatarValue = "👤"
         if !settings.userAvatarPath.isEmpty {
             if let image = NSImage(contentsOfFile: settings.userAvatarPath),
-               let tiffData = image.tiffRepresentation,
-               let bitmapImage = NSBitmapImageRep(data: tiffData),
-               let pngData = bitmapImage.representation(using: .png, properties: [:]) {
+                let tiffData = image.tiffRepresentation,
+                let bitmapImage = NSBitmapImageRep(data: tiffData),
+                let pngData = bitmapImage.representation(using: .png, properties: [:])
+            {
                 let base64String = pngData.base64EncodedString()
                 avatarValue = "data:image/png;base64,\(base64String)"
                 print("WebViewBridge: Converted avatar to data URL, size: \(pngData.count) bytes")
@@ -189,13 +225,14 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
             "selectedModel": selectedModel.id,
             "selectedModelName": selectedModel.name,
             "userName": settings.userName.isEmpty ? "User" : settings.userName,
-            "userAvatar": avatarValue
+            "userAvatar": avatarValue,
         ]
 
         print("WebViewBridge: Sending settings to JS - userName: \(settings.userName)")
 
         if let jsonData = try? JSONSerialization.data(withJSONObject: settingsDict),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
+            let jsonString = String(data: jsonData, encoding: .utf8)
+        {
             callJavaScript("window.onSettings?.(\(jsonString))")
         }
     }
@@ -214,7 +251,8 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
 
     func sendChunk(_ chunk: String) {
         // Escape the chunk for JavaScript string
-        let escapedChunk = chunk
+        let escapedChunk =
+            chunk
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
             .replacingOccurrences(of: "\n", with: "\\n")
@@ -225,7 +263,8 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
 
     func sendComplete(error: String? = nil) {
         if let error = error {
-            let escapedError = error
+            let escapedError =
+                error
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "'", with: "\\'")
             callJavaScript("window.onStreamError?.('\(escapedError)')")
@@ -260,11 +299,12 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
                 if jsonString == "[DONE]" { continue }
 
                 guard let jsonData = jsonString.data(using: .utf8),
-                      let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                      let choices = json["choices"] as? [[String: Any]],
-                      let firstChoice = choices.first,
-                      let delta = firstChoice["delta"] as? [String: Any],
-                      let content = delta["content"] as? String else {
+                    let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                    let choices = json["choices"] as? [[String: Any]],
+                    let firstChoice = choices.first,
+                    let delta = firstChoice["delta"] as? [String: Any],
+                    let content = delta["content"] as? String
+                else {
                     continue
                 }
 
@@ -275,7 +315,8 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
         }
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?)
+    {
         Task { @MainActor in
             if let error = error {
                 self.bridge?.sendComplete(error: error.localizedDescription)
@@ -285,7 +326,10 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
         }
     }
 
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+    func urlSession(
+        _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
         guard let httpResponse = response as? HTTPURLResponse else {
             completionHandler(.cancel)
             Task { @MainActor in
@@ -297,7 +341,8 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
         if httpResponse.statusCode != 200 {
             completionHandler(.cancel)
             Task { @MainActor in
-                self.bridge?.sendComplete(error: "API returned status code \(httpResponse.statusCode)")
+                self.bridge?.sendComplete(
+                    error: "API returned status code \(httpResponse.statusCode)")
             }
             return
         }
