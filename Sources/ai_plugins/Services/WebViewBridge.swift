@@ -4,7 +4,7 @@ import WebKit
 
 /// Bridge between WKWebView JavaScript and Swift
 /// Replaces JSCore-based JSBridge with a simpler WKWebView-only approach
-class WebViewBridge: NSObject, WKScriptMessageHandler {
+class WebViewBridge: NSObject, WKScriptMessageHandler, @unchecked Sendable {
 
     let tabId: UUID
     weak var webView: WKWebView?
@@ -31,6 +31,13 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
         print("WebViewBridge [\(tabId.uuidString.prefix(4))]: Received action: \(action)")
 
         switch action {
+        case "consoleLog":
+            // Handle JavaScript console.log output
+            if let level = body["level"] as? String,
+               let message = body["message"] as? String {
+                print("[JS Console.\(level)]: \(message)")
+            }
+
         case "log":
             if let logMessage = body["message"] as? String {
                 print("[Plugin Log]: \(logMessage)")
@@ -53,12 +60,150 @@ class WebViewBridge: NSObject, WKScriptMessageHandler {
                 handleExecuteCode(command: command, args: args, callbackId: callbackId)
             }
 
+        case "runPythonScript":
+            if let scriptName = body["script"] as? String,
+                let input = body["input"] as? String
+            {
+                handleRunPythonScript(scriptName: scriptName, input: input)
+            }
+
         default:
             print("WebViewBridge: Unknown action: \(action)")
         }
     }
 
     // MARK: - Handler Methods
+
+    private func handleRunPythonScript(scriptName: String, input: String) {
+        print("WebViewBridge: Running Python script: \(scriptName)")
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            // Get the script path from the Resources directory
+            // Try module bundle first (for SPM), then main bundle
+            var scriptPath: String?
+            if let modulePath = Bundle.module.path(forResource: scriptName.replacingOccurrences(of: ".py", with: ""), ofType: "py") {
+                scriptPath = modulePath
+            } else if let mainPath = Bundle.main.path(forResource: scriptName.replacingOccurrences(of: ".py", with: ""), ofType: "py") {
+                scriptPath = mainPath
+            }
+
+            guard let scriptPath = scriptPath else {
+                print("WebViewBridge: Python script not found: \(scriptName)")
+                let errorScript = "window.onPythonScriptError?.('Script not found: \(scriptName)')"
+                DispatchQueue.main.async {
+                    self.callJavaScript(errorScript)
+                }
+                return
+            }
+
+            print("WebViewBridge: Script path: \(scriptPath)")
+            print("WebViewBridge: Input JSON length: \(input.count) characters")
+            print("WebViewBridge: Input JSON preview: \(String(input.prefix(200)))...")
+
+            let process = Process()
+
+            // Try to use venv python if available, otherwise fall back to system python
+            let venvPython = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("rime/ai_plugins/venv/bin/python3")
+            let pythonPath = FileManager.default.fileExists(atPath: venvPython.path)
+                ? venvPython.path
+                : "/usr/bin/python3"
+
+            print("WebViewBridge: Using Python at: \(pythonPath)")
+            process.executableURL = URL(fileURLWithPath: pythonPath)
+            process.arguments = [scriptPath]
+
+            let inputPipe = Pipe()
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+
+            process.standardInput = inputPipe
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            // Write JSON input to stdin
+            if let inputData = input.data(using: .utf8) {
+                print("WebViewBridge: Writing \(inputData.count) bytes to Python stdin")
+                inputPipe.fileHandleForWriting.write(inputData)
+                inputPipe.fileHandleForWriting.closeFile()
+                print("WebViewBridge: Input pipe closed")
+            } else {
+                print("WebViewBridge: ERROR - Failed to convert input to UTF8 data")
+            }
+
+            // Read output line by line for progress updates
+            outputPipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.count > 0, let output = String(data: data, encoding: .utf8) {
+                    // Split by newlines and process each line
+                    let lines = output.components(separatedBy: "\n").filter { !$0.isEmpty }
+                    for line in lines {
+                        print("WebViewBridge: Python output: \(line)")
+                        // Escape the output for JavaScript
+                        let escapedOutput = line
+                            .replacingOccurrences(of: "\\", with: "\\\\")
+                            .replacingOccurrences(of: "'", with: "\\'")
+                            .replacingOccurrences(of: "\n", with: "\\n")
+                            .replacingOccurrences(of: "\r", with: "\\r")
+                        let script = "window.onPythonScriptOutput?.('\(escapedOutput)')"
+                        DispatchQueue.main.async {
+                            self.callJavaScript(script)
+                        }
+                    }
+                }
+            }
+
+            do {
+                print("WebViewBridge: Starting Python process with arguments: \(process.arguments ?? [])")
+                try process.run()
+
+                print("WebViewBridge: Python process started, PID: \(process.processIdentifier)")
+                process.waitUntilExit()
+
+                // Read all error output
+                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+
+                print("WebViewBridge: Python process terminated with status: \(process.terminationStatus)")
+
+                if !errorOutput.isEmpty {
+                    print("WebViewBridge: Python stderr output:")
+                    print("--- START STDERR ---")
+                    print(errorOutput)
+                    print("--- END STDERR ---")
+                }
+
+                if process.terminationStatus != 0 {
+                    print("WebViewBridge: Python script FAILED with exit code: \(process.terminationStatus)")
+
+                    var errorMessage = errorOutput
+                    if errorMessage.isEmpty {
+                        errorMessage = "Python script failed with exit code \(process.terminationStatus)"
+                    }
+
+                    let escapedError = errorMessage
+                        .replacingOccurrences(of: "\\", with: "\\\\")
+                        .replacingOccurrences(of: "'", with: "\\'")
+                        .replacingOccurrences(of: "\n", with: "\\n")
+                    let errorScript = "window.onPythonScriptError?.('\(escapedError)')"
+                    DispatchQueue.main.async {
+                        self.callJavaScript(errorScript)
+                    }
+                } else {
+                    print("WebViewBridge: Python script completed successfully (exit code 0)")
+                }
+            } catch {
+                print("WebViewBridge: EXCEPTION when running Python script: \(error)")
+                print("WebViewBridge: Error description: \(error.localizedDescription)")
+                let errorScript = "window.onPythonScriptError?.('Failed to execute: \(error.localizedDescription)')"
+                DispatchQueue.main.async {
+                    self.callJavaScript(errorScript)
+                }
+            }
+        }
+    }
 
     private func handleExecuteCode(command: String, args: [String], callbackId: String) {
         print("WebViewBridge: Executing command: \(command) with args: \(args)")
@@ -285,19 +430,29 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        guard let chunk = String(data: data, encoding: .utf8) else { return }
+        print("StreamingDelegate: Received \(data.count) bytes")
+        guard let chunk = String(data: data, encoding: .utf8) else {
+            print("StreamingDelegate: Failed to decode data as UTF-8")
+            return
+        }
         buffer += chunk
+        print("StreamingDelegate: Buffer size: \(buffer.count) characters")
 
         var lines = buffer.components(separatedBy: "\n")
         buffer = lines.popLast() ?? ""
 
+        print("StreamingDelegate: Processing \(lines.count) lines")
         for line in lines {
             guard !line.isEmpty, !line.hasPrefix(": ") else { continue }
 
             if line.hasPrefix("data: ") {
                 let jsonString = String(line.dropFirst(6))
-                if jsonString == "[DONE]" { continue }
+                if jsonString == "[DONE]" {
+                    print("StreamingDelegate: Received [DONE] signal")
+                    continue
+                }
 
+                print("StreamingDelegate: Parsing JSON: \(jsonString.prefix(100))...")
                 guard let jsonData = jsonString.data(using: .utf8),
                     let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                     let choices = json["choices"] as? [[String: Any]],
@@ -305,9 +460,11 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
                     let delta = firstChoice["delta"] as? [String: Any],
                     let content = delta["content"] as? String
                 else {
+                    print("StreamingDelegate: Failed to parse JSON or extract content")
                     continue
                 }
 
+                print("StreamingDelegate: Extracted content: \(content)")
                 Task { @MainActor in
                     self.bridge?.sendChunk(content)
                 }
@@ -317,10 +474,13 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?)
     {
+        print("StreamingDelegate: Request completed")
         Task { @MainActor in
             if let error = error {
+                print("StreamingDelegate: Completed with error: \(error.localizedDescription)")
                 self.bridge?.sendComplete(error: error.localizedDescription)
             } else {
+                print("StreamingDelegate: Completed successfully")
                 self.bridge?.sendComplete()
             }
         }
@@ -330,7 +490,9 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
         _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
         completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
+        print("StreamingDelegate: Received response")
         guard let httpResponse = response as? HTTPURLResponse else {
+            print("StreamingDelegate: Invalid response type")
             completionHandler(.cancel)
             Task { @MainActor in
                 self.bridge?.sendComplete(error: "Invalid response")
@@ -338,7 +500,9 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
             return
         }
 
+        print("StreamingDelegate: HTTP status code: \(httpResponse.statusCode)")
         if httpResponse.statusCode != 200 {
+            print("StreamingDelegate: Non-200 status code, cancelling")
             completionHandler(.cancel)
             Task { @MainActor in
                 self.bridge?.sendComplete(
@@ -347,6 +511,7 @@ private final class StreamingDelegate: NSObject, URLSessionDataDelegate, @unchec
             return
         }
 
+        print("StreamingDelegate: Response OK, allowing data")
         completionHandler(.allow)
     }
 }

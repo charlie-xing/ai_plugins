@@ -193,6 +193,13 @@ class PluginViewModel: ObservableObject {
         // Prepare settings JSON to inject
         let settingsJSON = createSettingsJSON()
 
+        // 加载PluginSDK和PluginBase
+        let sdkScript = loadSDKScript()
+        let baseScript = loadBaseScript()
+
+        // 生成插件上下文信息
+        let pluginId = currentPlugin?.id.uuidString ?? "unknown"
+
         return """
             <!DOCTYPE html>
             <html>
@@ -201,22 +208,147 @@ class PluginViewModel: ObservableObject {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
             </head>
             <body>
-                <script>
-                // Inject settings before plugin loads
-                window.INITIAL_SETTINGS = \(settingsJSON);
-                console.log('Injected settings:', window.INITIAL_SETTINGS);
+                <script type="text/javascript">
+                // Intercept console methods and forward to Swift
+                (function() {
+                    const originalLog = console.log;
+                    const originalError = console.error;
+                    const originalWarn = console.warn;
+                    const originalInfo = console.info;
+                    const originalDebug = console.debug;
 
-                // Plugin code
+                    function sendToSwift(level, args) {
+                        const message = args.map(arg => {
+                            if (typeof arg === 'object') {
+                                try {
+                                    return JSON.stringify(arg, null, 2);
+                                } catch (e) {
+                                    return String(arg);
+                                }
+                            }
+                            return String(arg);
+                        }).join(' ');
+
+                        try {
+                            window.webkit.messageHandlers.consoleLog.postMessage({
+                                action: 'consoleLog',
+                                level: level,
+                                message: message
+                            });
+                        } catch (e) {
+                            // Ignore if Swift bridge not available
+                        }
+                    }
+
+                    console.log = function(...args) {
+                        originalLog.apply(console, args);
+                        sendToSwift('log', args);
+                    };
+
+                    console.error = function(...args) {
+                        originalError.apply(console, args);
+                        sendToSwift('error', args);
+                    };
+
+                    console.warn = function(...args) {
+                        originalWarn.apply(console, args);
+                        sendToSwift('warn', args);
+                    };
+
+                    console.info = function(...args) {
+                        originalInfo.apply(console, args);
+                        sendToSwift('info', args);
+                    };
+
+                    console.debug = function(...args) {
+                        originalDebug.apply(console, args);
+                        sendToSwift('debug', args);
+                    };
+                })();
+
+                // Step 1: Inject plugin context
+                window.PLUGIN_ID = '\(pluginId)';
+                window.TAB_ID = '\(tabId.uuidString)';
+                window.PLUGIN_API_VERSION = '1.0.0';
+
+                // Step 2: Inject settings
+                window.INITIAL_SETTINGS = \(settingsJSON);
+
+                // Step 3: Load PluginSDK
+                \(sdkScript)
+
+                // Step 4: Load PluginBase
+                \(baseScript)
+
+                // Step 5: Load plugin code
                 \(pluginScript)
 
-                // Mark as ready
+                // Step 6: Mark as ready
                 window.addEventListener('DOMContentLoaded', function() {
-                    console.log('DOM loaded, plugin ready');
+                    console.log('[PluginLoader] DOM loaded, plugin ready');
                 });
                 </script>
             </body>
             </html>
             """
+    }
+
+    /// 加载PluginSDK脚本
+    private func loadSDKScript() -> String {
+        // Method 1: Try using Bundle.module.url (preferred for SPM)
+        if let sdkURL = Bundle.module.url(forResource: "PluginSDK", withExtension: "js"),
+           let sdkContent = try? String(contentsOf: sdkURL, encoding: .utf8) {
+            print("PluginViewModel: Loaded PluginSDK.js from Bundle.module.url, size: \(sdkContent.count)")
+            return sdkContent
+        }
+
+        // Method 2: Try Bundle.module.path
+        if let sdkPath = Bundle.module.path(forResource: "PluginSDK", ofType: "js"),
+           let sdkContent = try? String(contentsOfFile: sdkPath, encoding: .utf8) {
+            print("PluginViewModel: Loaded PluginSDK.js from Bundle.module.path, size: \(sdkContent.count)")
+            return sdkContent
+        }
+
+        // Method 3: Try Bundle.main as fallback
+        if let sdkPath = Bundle.main.path(forResource: "PluginSDK", ofType: "js"),
+           let sdkContent = try? String(contentsOfFile: sdkPath, encoding: .utf8) {
+            print("PluginViewModel: Loaded PluginSDK.js from Bundle.main, size: \(sdkContent.count)")
+            return sdkContent
+        }
+
+        print("PluginViewModel: ERROR - PluginSDK.js not found!")
+        print("PluginViewModel: Bundle.module.resourceURL = \(Bundle.module.resourceURL?.path ?? "nil")")
+        print("PluginViewModel: Bundle.main.resourceURL = \(Bundle.main.resourceURL?.path ?? "nil")")
+        return "console.error('[PluginLoader] PluginSDK.js not found');"
+    }
+
+    /// 加载PluginBase脚本
+    private func loadBaseScript() -> String {
+        // Method 1: Try using Bundle.module.url (preferred for SPM)
+        if let baseURL = Bundle.module.url(forResource: "PluginBase", withExtension: "js"),
+           let baseContent = try? String(contentsOf: baseURL, encoding: .utf8) {
+            print("PluginViewModel: Loaded PluginBase.js from Bundle.module.url, size: \(baseContent.count)")
+            return baseContent
+        }
+
+        // Method 2: Try Bundle.module.path
+        if let basePath = Bundle.module.path(forResource: "PluginBase", ofType: "js"),
+           let baseContent = try? String(contentsOfFile: basePath, encoding: .utf8) {
+            print("PluginViewModel: Loaded PluginBase.js from Bundle.module.path, size: \(baseContent.count)")
+            return baseContent
+        }
+
+        // Method 3: Try Bundle.main as fallback
+        if let basePath = Bundle.main.path(forResource: "PluginBase", ofType: "js"),
+           let baseContent = try? String(contentsOfFile: basePath, encoding: .utf8) {
+            print("PluginViewModel: Loaded PluginBase.js from Bundle.main, size: \(baseContent.count)")
+            return baseContent
+        }
+
+        print("PluginViewModel: ERROR - PluginBase.js not found!")
+        print("PluginViewModel: Bundle.module.resourceURL = \(Bundle.module.resourceURL?.path ?? "nil")")
+        print("PluginViewModel: Bundle.main.resourceURL = \(Bundle.main.resourceURL?.path ?? "nil")")
+        return "console.error('[PluginLoader] PluginBase.js not found');"
     }
 
     private func createSettingsJSON() -> String {

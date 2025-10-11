@@ -1,14 +1,44 @@
 import Foundation
 
 class PluginManager {
-    
+
+    /// 合并发现动态插件和旧版插件
+    /// - Parameter directory: 旧版插件目录 (Resources/plugins)
+    /// - Returns: 所有插件的数组
+    @MainActor
+    func discoverAllPlugins(in directory: URL) -> [Plugin] {
+        var allPlugins: [Plugin] = []
+
+        // 1. 从DynamicPluginManager加载新版插件
+        let dynamicPlugins = DynamicPluginManager.shared.discoverPlugins()
+        for dynamicPlugin in dynamicPlugins {
+            let plugin = dynamicPlugin.toLegacyPlugin()
+            allPlugins.append(plugin)
+        }
+        print("PluginManager: Loaded \(dynamicPlugins.count) dynamic plugins")
+
+        // 2. 加载旧版插件（仅从Resources目录）
+        let legacyPlugins = discoverLegacyPlugins(in: directory)
+        allPlugins.append(contentsOf: legacyPlugins)
+        print("PluginManager: Loaded \(legacyPlugins.count) legacy plugins")
+
+        print("PluginManager: Total \(allPlugins.count) plugins available")
+        return allPlugins
+    }
+
     /// Scans a given directory for `.js` files and parses their metadata to create Plugin objects.
     /// - Parameter directory: The URL of the directory to scan.
     /// - Returns: An array of `Plugin` objects found in the directory.
+    @MainActor
     func discoverPlugins(in directory: URL) -> [Plugin] {
+        return discoverAllPlugins(in: directory)
+    }
+
+    /// 仅发现旧版插件（用于向后兼容）
+    private func discoverLegacyPlugins(in directory: URL) -> [Plugin] {
         var discoveredPlugins: [Plugin] = []
         let fileManager = FileManager.default
-        
+
         do {
             let fileURLs = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             for url in fileURLs {
@@ -19,9 +49,9 @@ class PluginManager {
                 }
             }
         } catch {
-            print("Error scanning plugin directory: \(error)")
+            print("PluginManager: Error scanning legacy plugin directory: \(error)")
         }
-        
+
         return discoveredPlugins
     }
     

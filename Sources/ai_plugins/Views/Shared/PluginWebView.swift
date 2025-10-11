@@ -17,6 +17,8 @@ struct PluginWebView: NSViewRepresentable {
         userContentController.add(context.coordinator.bridge, name: "callAI")
         userContentController.add(context.coordinator.bridge, name: "log")
         userContentController.add(context.coordinator.bridge, name: "getSettings")
+        userContentController.add(context.coordinator.bridge, name: "runPythonScript")
+        userContentController.add(context.coordinator.bridge, name: "consoleLog")
 
         config.userContentController = userContentController
 
